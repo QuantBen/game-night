@@ -22,6 +22,7 @@ export function isConfigured() {
   return typeof u === 'string' && /^https:\/\/\S+$/.test(u) && !/PASTE_|YOUR[_-]/i.test(u);
 }
 export function wantsLocal() {
+  if (window.PG_PREVIEW) return true;
   try { return new URLSearchParams(location.search).has('local'); } catch (e) { return false; }
 }
 /** Keeps ?local=1 on links while testing. */

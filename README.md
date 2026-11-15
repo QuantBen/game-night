@@ -3,7 +3,10 @@
 Party games for people in the same room. Everyone plays on their own phone; no app to install, no game master.
 
 - `/` is the hub: pick a game, or type a room code to jump straight in.
-- `/werewolf` is narrated Werewolf. One device (the "narrator") speaks every command out loud and runs the game; everyone else joins with a 4-letter room code or by scanning the QR code on the narrator's screen.
+- `/werewolf` is narrated Werewolf.
+- `/storyteller` is a bluffing game: each round one player guesses, everyone else gets the same strange word or "historical event", one storyteller secretly has the real version, and the rest make one up.
+
+In every game, one device (the "narrator") speaks the commands out loud and runs the game; everyone else joins with a 4-letter room code or by scanning the QR code on the narrator's screen.
 
 The site is plain HTML/JS with no build step. Live sync between phones goes through one free Firebase Realtime Database that every game shares.
 
@@ -46,15 +49,29 @@ Tips:
 - The narrator bar has **Repeat**, **Skip** (if someone stops responding), **Voice** (pick a voice or go silent), **Players** (remove someone who left), and **End game**.
 - Trying it alone? In the lobby, tap **Add bots**.
 
+## Playing Storyteller
+
+1. Host and join exactly as for Werewolf. In the lobby the narrator picks the cards (**Mix**, **Weird words** or **Strange stories**) and how many storytellers per round (**Everyone**, or **3** / **4** to keep big groups quick), then taps **Start game**.
+2. Each round, one player is the guesser and everyone else sees the same mystery word or story title. One storyteller's phone shows the real meaning or story; the others see **Make it up!** Everyone taps **I'm ready**.
+3. The narrator calls each storyteller in turn. They tell it out loud and tap **Done** (the guesser can also tap **Next storyteller**).
+4. The guesser picks who has the real one. Right: +1 to the guesser. Wrong: +1 to the bluffer they picked. The reveal shows whether the card is genuinely real or invented.
+5. Everyone guesses once; most points wins. **Play again** deals fresh cards.
+
+The cards live in [`storyteller/cards.js`](storyteller/cards.js): 50 words and 50 stories, each marked `real: true` or `real: false`. Add your own anywhere in either list.
+
 ## Test mode (no Firebase needed)
 
 Add `?local=1` to any URL, e.g. `/werewolf?local=1`. Tabs in the same browser then talk to each other directly, which is handy for trying things on one computer.
 
 ## Adding another game
 
-1. Create a folder with an `index.html`, e.g. `/spyfall/index.html`. Include `/shared/base.css` for the shared look.
-2. Use `/shared/realtime.js` for rooms and live sync: `connect()`, `createRoom(B, 'spyfall')`, `roomInfo()`, and the backend's `get / set / on / presence` calls. `werewolf/index.html` shows the full pattern (a host device that owns the game state, and players that send their inputs).
+New games are built on [`shared/kit.js`](shared/kit.js), which already handles rooms, joining, the lobby, QR codes, the narrator voice, the narrator device's game loop, practice bots and rendering. A game only defines its rules and screens.
+
+1. Copy the `storyteller/` folder as a starting point, e.g. to `/spyfall/`. Point the `<script>` tag in its `index.html` at `/spyfall/game.js`.
+2. In `game.js`, change the `setup({...})` call: `id: 'spyfall'`, the name, the starting state, `engine(s, inp)` (runs on the narrator device and moves the game along when players' inputs arrive), and `main(s, me)` (the screens).
 3. Add an entry to the `GAMES` list at the bottom of `/index.html`.
+
+(Werewolf predates the kit and still carries its own copy of this machinery.)
 
 Room codes are shared across games, so the hub's "Got a room code?" box sends people to the right game automatically.
 
@@ -63,6 +80,8 @@ Room codes are shared across games, so the hub's "Got a room code?" box sends pe
 ```
 index.html                 hub / game picker
 werewolf/index.html        Werewolf
+storyteller/               Storyteller (index.html, game.js, cards.js)
+shared/kit.js              rooms, lobby, narrator, bots, rendering for new games
 shared/base.css            shared styles
 shared/realtime.js         rooms + live sync (Firebase, or ?local=1 test mode)
 shared/firebase-config.js  your database URL goes here
