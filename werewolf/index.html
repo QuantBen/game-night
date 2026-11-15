@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1124">
+<meta name="description" content="Werewolf, narrated. Everyone plays on their own phone; one device speaks the commands.">
+<title>Werewolf — Game Night</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐺%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/base.css">
+<style>
+:root{--wolf:#e05252;--seer:#a083ff;--doctor:#3ec28f;--villager:#e0a84a}
+.me{margin-left:auto;font-size:13px;color:var(--muted);max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.big-name{font-family:Cinzel,Georgia,serif;font-size:22px;font-weight:800}
+.steps{list-style:none;counter-reset:s;margin-top:4px}
+.steps li{counter-increment:s;position:relative;padding:6px 0 6px 34px;color:var(--muted);font-size:15px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:6px;width:24px;height:24px;border-radius:50%;background:var(--card2);border:1px solid var(--line);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--text)}
+
+/* room share */
+.share-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.code{font-family:Cinzel,Georgia,serif;font-size:44px;font-weight:800;letter-spacing:.14em;line-height:1.05}
+.qr{background:#fff;border-radius:12px;padding:8px;width:132px;height:132px;flex:none}
+.qr svg{width:100%;height:100%;display:block}
+.link-text{word-break:break-all;margin-top:6px}
+
+/* players */
+.prow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.prow:first-of-type{border-top:0}
+.prow .pn{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .pr{font-size:13px;color:var(--muted)}
+.prow .pm{font-size:12px;color:var(--muted)}
+.prow .pi{font-size:20px;width:26px;text-align:center}
+.prow.dead .pn{text-decoration:line-through;color:var(--muted)}
+.prow .ps{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+.prow .ps.alive{color:var(--ok)}
+.prow .ps.dead{color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--muted);opacity:.5}
+.dot.on{background:var(--ok);opacity:1;box-shadow:0 0 0 3px rgba(70,198,143,.18)}
+
+/* settings */
+.opt{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)}
+.opt:first-of-type{border-top:0}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper b{min-width:28px;text-align:center;font-size:18px}
+.stepper button{width:36px;height:36px;border-radius:10px;background:var(--card2);border:1px solid var(--line);font-size:18px;font-weight:700}
+.switch{width:52px;height:30px;border-radius:99px;background:var(--card2);border:1px solid var(--line);position:relative;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.switch.on{background:var(--accent)}
+.switch.on::after{transform:translateX(22px);background:var(--accent-ink)}
+
+.narr{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:15px}
+.narr-ico{flex:none}
+
+/* face-down cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:12px;margin:14px 0}
+.fcard{aspect-ratio:5/7;border-radius:12px;position:relative;overflow:hidden;border:1px solid rgba(233,196,106,.35);
+  background:
+    radial-gradient(circle at 50% 50%,rgba(233,196,106,.25) 0 14px,transparent 15px),
+    repeating-linear-gradient(45deg,rgba(233,196,106,.09) 0 6px,transparent 6px 12px),
+    repeating-linear-gradient(-45deg,rgba(233,196,106,.09) 0 6px,transparent 6px 12px),
+    linear-gradient(160deg,#2b2160,#151236);
+  box-shadow:0 6px 18px rgba(0,0,0,.35);transition:transform .15s ease}
+.fcard::after{content:"";position:absolute;inset:6px;border-radius:8px;border:1px solid rgba(233,196,106,.25)}
+.fcard:not(:disabled):active{transform:scale(.96)}
+.fcard:not(:disabled):hover{transform:translateY(-2px)}
+.fcard.taken{filter:grayscale(1) brightness(.55)}
+.fcard.pending{outline:3px solid var(--accent);animation:pulse 1s ease-in-out infinite}
+.fcard .owner{position:absolute;left:6px;right:6px;bottom:10px;font-size:12px;font-weight:600;color:#fff;text-align:center;z-index:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* role card */
+.rcard{--rc:#888;position:relative;border-radius:22px;padding:26px 20px 22px;text-align:center;color:#fff;
+  background:radial-gradient(120% 80% at 50% 0%,var(--rc),color-mix(in srgb,var(--rc) 45%,#0b0b18) 70%);
+  border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 40px rgba(0,0,0,.35),inset 0 0 0 6px rgba(255,255,255,.06)}
+.rcard.flip-in{animation:flipIn .7s cubic-bezier(.2,.8,.2,1)}
+.rc-title{font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.85;margin-bottom:4px}
+.rc-ico{font-size:64px;line-height:1.1;margin:4px 0}
+.rc-name{font-family:Cinzel,Georgia,serif;font-size:30px;font-weight:800}
+.rc-team{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;margin-top:2px}
+.rc-desc{margin-top:14px;font-size:15px;line-height:1.5;opacity:.95}
+.rc-extra{margin-top:12px;font-size:14px;background:rgba(0,0,0,.22);border-radius:12px;padding:10px 12px;text-align:left}
+.rcard.compact{padding:16px 16px 14px}
+.rcard.compact .rc-ico{font-size:40px}
+.rcard.compact .rc-name{font-size:22px}
+.peek-btn{width:100%;padding:14px;border-radius:14px;border:1px dashed var(--line);color:var(--muted);font-weight:600;margin-bottom:14px;background:var(--card)}
+.peek{margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
+
+/* night */
+.sleep{text-align:center;padding:40px 10px 20px}
+.say-dim{margin-top:22px;font-style:italic;color:var(--muted);font-size:15px}
+.action{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.action.wolf{border-color:rgba(224,82,82,.45)}
+.action.seer{border-color:rgba(160,131,255,.45)}
+.action.doctor{border-color:rgba(62,194,143,.45)}
+.act-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.act-ico{font-size:40px}
+.targets{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.target{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;text-align:left;padding:14px 16px;border-radius:14px;background:var(--card2);border:1px solid var(--line);font-weight:600;font-size:17px}
+.target.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.target.skip{margin-top:8px;font-weight:500;color:var(--muted);justify-content:center}
+.target.skip.sel{color:var(--text)}
+.target:disabled{opacity:.4}
+.tname{flex:1}
+.tnote{font-size:12px;font-weight:500;color:var(--muted)}
+.tag{font-size:12px;font-weight:600;padding:3px 8px;border-radius:99px;background:rgba(224,82,82,.18);color:#ff9d9d}
+body.day .tag{background:rgba(180,83,28,.12);color:#8a3d12}
+.reveal{border-radius:18px;padding:24px 16px;text-align:center;margin:6px 0 4px}
+.reveal.bad{background:rgba(224,82,82,.14);border:1px solid rgba(224,82,82,.5)}
+.reveal.good{background:rgba(70,198,143,.12);border:1px solid rgba(70,198,143,.45)}
+.rv-ico{font-size:52px}
+.rv-name{font-family:Cinzel,Georgia,serif;font-size:26px;font-weight:800;margin-top:4px}
+.rv-txt{font-size:16px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:4px}
+.hist{margin-top:14px;font-size:14px;color:var(--muted)}
+.hist div{padding:3px 0}
+
+/* day */
+.news{text-align:center;padding:22px 18px}
+.news h2{margin-top:6px}
+.big-emoji{font-size:48px;line-height:1.2}
+.tally{display:flex;flex-direction:column;gap:8px;margin:14px 0}
+.trow{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 12px;border-radius:12px;background:var(--card2);border:1px solid var(--line)}
+.trow.out{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.tn{font-weight:700}
+.tc{font-weight:800;font-size:18px}
+.tv{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.reveal-card{margin:16px 0 8px}
+.big-text{font-size:20px;font-weight:700;margin:18px 0}
+.win{text-align:center;padding:30px 18px;border-radius:var(--r);margin-bottom:14px;border:1px solid var(--line)}
+.win.village{background:linear-gradient(160deg,rgba(224,168,74,.28),rgba(62,194,143,.18))}
+.win.wolves{background:linear-gradient(160deg,rgba(224,82,82,.32),rgba(40,10,20,.4))}
+.win h1{margin:8px 0}
+.win p{color:var(--muted);margin-top:8px}
+
+/* narrator bar */
+.hostbar{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 12px;margin-bottom:14px;box-shadow:0 10px 26px rgba(0,0,0,.25)}
+.hostbar.resume,.hostbar.warn{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px}
+.hostbar.warn{border-color:rgba(240,163,94,.5)}
+.hb-top{display:flex;gap:10px;align-items:flex-start}
+.hb-mic{font-size:20px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--card2);flex:none}
+.hb-mic.on{box-shadow:0 0 0 3px var(--accent);animation:pulse 1.2s ease-in-out infinite}
+.hb-txt{flex:1;min-width:0}
+.hb-label{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.hb-say{font-size:15px;margin-top:2px}
+.hb-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.panel{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.seg button{padding:7px 12px;border-radius:10px;border:1px solid var(--line);font-size:13px;font-weight:600}
+.seg button.on{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.select{width:100%;font:inherit;font-size:14px;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);margin-bottom:10px}
+.rules{flex-basis:100%;font-size:14px;color:var(--muted)}
+.rules h4{color:var(--text);margin:12px 0 4px;font-size:14px}
+.rules ul{padding-left:18px}
+@keyframes flipIn{from{transform:perspective(900px) rotateY(95deg);opacity:.3}to{transform:perspective(900px) rotateY(0);opacity:1}}
+</style>
+</head>
+<body class="dusk">
+<div id="app"><div class="wrap"><div class="loading"><p>Loading…</p></div></div></div>
+<noscript>This game needs JavaScript.</noscript>
+<script type="module">
+import { connect, createRoom, normCode, roomInfo, withLocal } from '/shared/realtime.js';
+
+const GAME_ID = 'werewolf';
+const PREVIEW = !!window.WW_PREVIEW;   // single-device preview build
+
+/* ================= basics ================= */
+const FAST = !!window.WW_FAST;                 // test hook: speeds up all pauses
+const T = ms => FAST ? Math.max(60, Math.round(ms / 12)) : ms;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const now = () => Date.now();
+const clone = o => JSON.parse(JSON.stringify(o));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function rid(n = 10) {
+  const a = 'abcdefghijkmnpqrstuvwxyz23456789'; let s = '';
+  for (const x of crypto.getRandomValues(new Uint8Array(n))) s += a[x % a.length];
+  return s;
+}
+const store = {
+  get(k, sess) { try { return (sess ? sessionStorage : localStorage).getItem(k); } catch (e) { return null; } },
+  set(k, v, sess) { try { (sess ? sessionStorage : localStorage).setItem(k, v); } catch (e) {} },
+};
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  if (props) for (const k in props) {
+    const v = props[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'value') e.value = v;
+    else if (k.startsWith('on')) (e.__on || (e.__on = {}))[k.slice(2)] = v;
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat(Infinity)) {
+    if (c == null || c === false || c === '') continue;
+    e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return e;
+}
+// One listener per event type; handlers live on the nodes so in-place updates can swap them.
+for (const type of ['click', 'input', 'keydown', 'change']) {
+  document.addEventListener(type, ev => {
+    for (let n = ev.target; n && n !== document; n = n.parentNode) {
+      if (n.__on && n.__on[type]) { if (type === 'click' && n.disabled) return; n.__on[type](ev); return; }
+    }
+  });
+}
+// Update the live DOM to match a freshly built tree, touching only what changed (taps aren't lost mid-update).
+function morph(a, b) {
+  if (a.nodeType !== b.nodeType || a.nodeName !== b.nodeName) { a.replaceWith(b); return; }
+  if (a.nodeType === 3) { if (a.data !== b.data) a.data = b.data; return; }
+  if (a.nodeType !== 1) { a.replaceWith(b); return; }
+  for (const at of [...a.attributes]) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+  for (const at of [...b.attributes]) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+  a.__on = b.__on;
+  if ((a.tagName === 'INPUT' || a.tagName === 'SELECT') && a !== document.activeElement && a.value !== b.value) a.value = b.value;
+  if (b.__html !== undefined) { if (a.__html !== b.__html) { a.innerHTML = b.__html; a.__html = b.__html; } return; }
+  const ac = [...a.childNodes], bc = [...b.childNodes];
+  for (let i = 0; i < bc.length; i++) { if (i < ac.length) morph(ac[i], bc[i]); else a.appendChild(bc[i]); }
+  for (let i = bc.length; i < ac.length; i++) ac[i].remove();
+}
+function cleanName(n) {
+  return String(n || '').replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff]/g, '')
+    .replace(/\s+/g, ' ').trim().slice(0, 18);
+}
+function listJoin(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+/* ================= roles ================= */
+const ROLES = {
+  wolf:     { name: 'Werewolf', icon: '🐺', team: 'wolves', color: '#d94848', desc: 'Each night, wake up with the other werewolves and agree on one person to eliminate. By day, act innocent and steer the vote away from your pack.' },
+  seer:     { name: 'Seer',     icon: '🔮', team: 'village', color: '#8f6cf0', desc: 'Each night, choose one player and learn whether they are a werewolf. Use what you know without exposing yourself too early.' },
+  doctor:   { name: 'Doctor',   icon: '🩺', team: 'village', color: '#2fae7f', desc: 'Each night, choose one player to protect from the werewolves. You may protect yourself, but not the same person two nights in a row.' },
+  villager: { name: 'Villager', icon: '🧑‍🌾', team: 'village', color: '#d29a3a', desc: 'No night power. Listen closely, question everyone, and use your vote to find the werewolves.' },
+};
+function article(r) { return { wolf: 'a Werewolf', seer: 'the Seer', doctor: 'the Doctor', villager: 'a Villager' }[r] || 'a mystery'; }
+// Light obfuscation so roles aren't stored as plain words.
+function enc(role, salt) {
+  const s = role + '|' + salt; let o = '';
+  for (let i = 0; i < s.length; i++) o += String.fromCharCode(s.charCodeAt(i) ^ (salt.charCodeAt(i % salt.length) & 15));
+  return btoa(o);
+}
+function dec(code, salt) {
+  try { const s = atob(code); let o = ''; for (let i = 0; i < s.length; i++) o += String.fromCharCode(s.charCodeAt(i) ^ (salt.charCodeAt(i % salt.length) & 15)); return o.split('|')[0]; }
+  catch (e) { return null; }
+}
+function defaultCfg(n) { return { wolves: n <= 5 ? 1 : n <= 8 ? 2 : n <= 12 ? 3 : 4, seer: true, doctor: n >= 5 }; }
+function cfgProblems(c, n) {
+  const sp = (c.seer ? 1 : 0) + (c.doctor ? 1 : 0);
+  if (n < 3) return ['You need at least 3 players (5 or more is more fun).'];
+  if (c.wolves < 1) return ['You need at least one werewolf.'];
+  if (c.wolves * 2 >= n) return [`Too many werewolves for ${n} players.`];
+  if (c.wolves + sp > n) return ['Not enough players for all these roles.'];
+  return [];
+}
+function buildDeck(n, c) {
+  const d = [];
+  for (let i = 0; i < c.wolves; i++) d.push('wolf');
+  if (c.seer) d.push('seer');
+  if (c.doctor) d.push('doctor');
+  while (d.length < n) d.push('villager');
+  return shuffle(d.slice(0, n));
+}
+
+/* ================= shared game helpers ================= */
+const roleOf = (s, p) => (p && p.role && s.deal) ? dec(p.role, s.deal.id) : null;
+const byPid = (s, pid) => (s.players || []).find(p => p.pid === pid);
+const nm = (s, pid) => { const p = byPid(s, pid); return p ? p.name : '?'; };
+const key = (s, x) => `${s.deal ? s.deal.id : 'x'}-${s.round}-${x}`;
+const aliveOf = s => s.players.filter(p => p.alive);
+function winner(s) {
+  const a = aliveOf(s); const w = a.filter(p => roleOf(s, p) === 'wolf').length;
+  if (w === 0) return 'village';
+  if (w >= a.length - w) return 'wolves';
+  return null;
+}
+
+/* ================= identity ================= */
+let myPid = store.get('ww_pid', true);
+if (!myPid) { myPid = rid(10); store.set('ww_pid', myPid, true); }
+let myInput = { pid: myPid };
+
+/* ================= ui state ================= */
+const S = {
+  nameDraft: store.get('ww_name') || '', codeDraft: '', peekUntil: 0, sel: {}, confirm: null, rules: false,
+  hostOpen: true, panel: null, toast: '', flipped: {}, joinAt: 0, busy: false,
+};
+let QR = null;
+import('/shared/vendor/qrcode.js').then(m => { QR = m.default; render(); }).catch(() => {});
+
+/* ================= network ================= */
+const Net = {
+  mode: 'connecting',          // connecting | ready | unconfigured | error
+  B: null, code: null, room: null, // room: loading | ok | missing | error
+  connected: false, enteredAt: 0, unsubs: [],
+  state: null, gotState: false,
+  inputs: {}, online: new Set(), hostOnline: false, hostSeen: 0,
+};
+const base = () => `rooms/${Net.code}`;
+
+function mergeInput(inp) {
+  if (!inp || typeof inp !== 'object' || typeof inp.pid !== 'string' || typeof inp.ts !== 'number') return false;
+  const cur = Net.inputs[inp.pid];
+  if (cur && cur.ts >= inp.ts) return false;
+  Net.inputs[inp.pid] = inp;
+  return true;
+}
+function acceptState(st) {
+  if (!st || typeof st !== 'object' || typeof st.ver !== 'number' || !Array.isArray(st.players)) return;
+  const cur = Net.state;
+  if (cur && (st.ver < cur.ver || (st.ver === cur.ver && (st.ts || 0) <= (cur.ts || 0)))) return;
+  Net.state = st;
+  if (Host.active && st.host !== myPid) Host.stop('Another device is narrating now.');
+  render(); hostKick();
+}
+
+const writers = {};
+function queueWrite(path, data) {
+  const w = writers[path] || (writers[path] = { busy: false, next: null, tries: 0 });
+  w.next = data;
+  if (!w.busy) pump(path);
+}
+async function pump(path) {
+  const w = writers[path]; w.busy = true;
+  while (w.next != null) {
+    const d = w.next; w.next = null;
+    try { await Net.B.set(path, d); w.tries = 0; }
+    catch (e) {
+      console.warn('write failed', path, e);
+      if (w.tries < 4) { w.tries++; await sleep(600 * w.tries); if (w.next == null) w.next = d; continue; }
+      w.tries = 0; toast('Couldn’t save. Check your internet connection.');
+    }
+  }
+  w.busy = false;
+}
+function publishState(s) {
+  s.ver = Math.max(s.ver || 0, Net.state ? Net.state.ver : 0) + 1;
+  s.ts = now();
+  Net.state = s;
+  queueWrite(base() + '/state', JSON.stringify(s));
+  render(); hostKick();
+}
+function saveInputLocal() { store.set('ww_inp', JSON.stringify({ code: Net.code, inp: myInput }), true); }
+function sendInput(patch) {
+  myInput = Object.assign({}, myInput, patch, { pid: myPid, ts: Math.max(now(), (myInput.ts || 0) + 1) });
+  saveInputLocal();
+  if (Host.active) { mergeInput(myInput); hostKick(); }
+  queueWrite(`${base()}/inputs/${myPid}`, JSON.stringify(myInput));
+  updatePresence();
+  render();
+}
+let lastPresence = null;
+function updatePresence() {
+  if (!Net.B || !Net.code) return;
+  const v = Host.active ? 'h' : (myInput.gid ? 'p' : 'w');
+  if (v === lastPresence) return;
+  lastPresence = v;
+  Net.B.presence(`${base()}/presence/${myPid}`, v);
+}
+function onPresence(map) {
+  const online = new Set(Object.keys(map || {}));
+  const s = Net.state;
+  const hostOn = !!(s && map && map[s.host] === 'h');
+  const changed = !same([...online].sort(), [...Net.online].sort()) || hostOn !== Net.hostOnline;
+  Net.online = online; Net.hostOnline = hostOn; if (hostOn) Net.hostSeen = now();
+  if (changed) render();
+}
+function leaveRoom() {
+  for (const u of Net.unsubs) { try { u(); } catch (e) {} }
+  Net.unsubs = [];
+  if (Host.active) Host.stop();
+  if (Net.B && Net.code) Net.B.presence(`${base()}/presence/${myPid}`, null);
+  lastPresence = null;
+  Net.code = null; Net.room = null; Net.state = null; Net.gotState = false; Net.inputs = {}; Net.online = new Set();
+}
+function roomUrl(code) { return withLocal(`${location.origin}${location.pathname}?room=${code || Net.code}`); }
+function setUrl(code) {
+  try { history.replaceState(null, '', withLocal(code ? `${location.pathname}?room=${code}` : location.pathname)); } catch (e) {}
+}
+async function enterRoom(code, { created } = {}) {
+  leaveRoom();
+  Net.code = code; Net.room = 'loading'; Net.enteredAt = now(); render();
+  if (!created) {
+    let meta = null;
+    try { meta = await roomInfo(Net.B, code); } catch (e) { Net.room = 'error'; render(); return false; }
+    if (Net.code !== code) return false;
+    if (!meta) { Net.room = 'missing'; setUrl(null); render(); return false; }
+    if (meta.game && meta.game !== GAME_ID) { location.href = withLocal(`/${encodeURIComponent(meta.game)}?room=${code}`); return false; }
+  }
+  setUrl(code);
+  Net.room = 'ok';
+  // restore this tab's last input for this room (e.g. after a reload)
+  myInput = { pid: myPid };
+  try { const j = JSON.parse(store.get('ww_inp', true) || 'null'); if (j && j.code === code && j.inp && j.inp.pid === myPid) myInput = j.inp; } catch (e) {}
+  Net.unsubs.push(Net.B.on(`${base()}/state`, v => {
+    Net.gotState = true;
+    if (typeof v === 'string') { try { acceptState(JSON.parse(v)); } catch (e) {} }
+    render();
+  }, () => { Net.room = 'error'; render(); }));
+  Net.unsubs.push(Net.B.on(`${base()}/presence`, v => onPresence(v)));
+  if (!created) {
+    try {
+      const raw = await Net.B.get(`${base()}/inputs/${myPid}`);
+      if (typeof raw === 'string') { const d = JSON.parse(raw); if (d && d.pid === myPid && (!myInput.ts || d.ts > myInput.ts)) { myInput = d; saveInputLocal(); } }
+    } catch (e) {}
+  }
+  updatePresence();
+  render();
+  return true;
+}
+
+/* ================= narrator voice (this device only) ================= */
+const Narrator = {
+  engine: store.get('ww_voice_on') === 'off' ? 'off' : 'device',
+  voiceName: store.get('ww_voice') || '', speakingId: null, done: {}, gen: 0,
+  which() { if (FAST || this.engine === 'off' || !window.speechSynthesis) return 'off'; return 'device'; },
+  prime() { // must run inside a tap so phones allow speech later
+    try { if (window.speechSynthesis && !FAST) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch (e) {}
+  },
+  est(text) { return T(Math.max(1600, text.split(/\s+/).length * 400 + 700)); },
+  voices() {
+    try { return (speechSynthesis.getVoices() || []).filter(v => /^en/i.test(v.lang)); } catch (e) { return []; }
+  },
+  pickVoice() {
+    const vs = this.voices();
+    return vs.find(v => v.name === this.voiceName)
+      || vs.find(v => /en-GB/i.test(v.lang) && /daniel|arthur|male/i.test(v.name))
+      || vs.find(v => /en-GB/i.test(v.lang)) || vs.find(v => /en-US/i.test(v.lang)) || vs[0] || null;
+  },
+  async say(id, text) {
+    if (this.speakingId === id || this.done[id]) return;
+    STATS.says++;
+    const g = ++this.gen; this.speakingId = id; render();
+    const est = this.est(text);
+    const p = this.which() === 'device' ? this.deviceSay(text) : sleep(est);
+    await Promise.race([p, sleep(est * 2 + 5000)]);
+    if (g !== this.gen) return;            // stopped or repeated meanwhile
+    this.speakingId = null; this.done[id] = now();
+    render(); hostKick();
+  },
+  deviceSay(text) {
+    return new Promise(res => {
+      try {
+        const ss = window.speechSynthesis; ss.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.92; u.pitch = 0.9; const v = this.pickVoice(); if (v) { u.voice = v; u.lang = v.lang; }
+        u.onend = () => res(); u.onerror = () => res();
+        ss.speak(u);
+      } catch (e) { res(); }
+    });
+  },
+  stop() { this.gen++; this.speakingId = null; try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {} },
+  repeat() { const s = Net.state; if (!s || !s.say) return; this.prime(); this.stop(); delete this.done[s.say.id]; render(); hostKick(); },
+  test() { this.prime(); this.stop(); this.say('test-' + rid(4), 'Hello everyone. I will be your narrator tonight.'); },
+};
+try { speechSynthesis.addEventListener('voiceschanged', () => render()); } catch (e) {}
+
+/* ================= keep screens awake ================= */
+let wakeLock = null;
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && document.visibilityState === 'visible' && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (Host.active || myInput.gid)) keepAwake(); });
+
+/* ================= narrator / host engine ================= */
+const Host = {
+  active: false, iv: null, unsub: null, tickQ: false,
+  start() {
+    if (this.active || !Net.code) return;
+    this.active = true; Narrator.prime(); keepAwake();
+    this.unsub = Net.B.on(`${base()}/inputs`, obj => {
+      let ch = false;
+      for (const raw of Object.values(obj || {})) { if (typeof raw !== 'string') continue; try { if (mergeInput(JSON.parse(raw))) ch = true; } catch (e) {} }
+      if (ch) hostKick();
+    });
+    this.iv = setInterval(() => this.tick(), 400);
+    updatePresence(); this.tick(); render();
+  },
+  stop(msg) {
+    this.active = false; clearInterval(this.iv); this.iv = null;
+    if (this.unsub) { try { this.unsub(); } catch (e) {} this.unsub = null; }
+    Narrator.stop(); updatePresence();
+    if (msg) toast(msg);
+    render();
+  },
+  tick() {
+    STATS.ticks++;
+    if (!this.active) return;
+    const cur = Net.state; if (!cur) return;
+    if (cur.host !== myPid) { this.stop(); return; }
+    if (cur.say && !Narrator.done[cur.say.id] && Narrator.speakingId !== cur.say.id) Narrator.say(cur.say.id, cur.say.text);
+    const s = clone(cur);
+    let ch = false;
+    try { ch = engine(s); } catch (e) { console.error(e); }
+    if (ch) publishState(s);
+  },
+};
+function hostKick() {
+  if (!Host.active || Host.tickQ) return;
+  Host.tickQ = true; setTimeout(() => { Host.tickQ = false; Host.tick(); }, 40);
+}
+function hostAct(fn) {
+  if (!Host.active || !Net.state) return;
+  const s = clone(Net.state);
+  if (fn(s) !== false) publishState(s);
+}
+
+function go(s, phase, step, text) { s.phase = phase; s.step = step; s.stepAt = now(); s.say = text ? { id: rid(6), text } : null; }
+function sayDone(s, extra) {
+  extra = extra || 0;
+  if (!s.say) return now() - s.stepAt >= extra;
+  const d = Narrator.done[s.say.id];
+  return !!d && now() - d >= extra;
+}
+const inputFor = s => pid => { const i = Net.inputs[pid]; return i && i.gid === s.gid ? i : null; };
+const validWolfTarget = (s, t) => { const p = byPid(s, t); return !!p && p.alive && roleOf(s, p) !== 'wolf'; };
+const validTarget = (s, t, self) => { const p = byPid(s, t); return !!p && p.alive && t !== self; };
+const validDocTarget = (s, t) => { const p = byPid(s, t); return !!p && p.alive && t !== (s.night && s.night.lastDoc); };
+
+function engine(s) {
+  if (s.players.some(p => isBot(p.pid))) Bots.act(s);
+  const inp = inputFor(s);
+  switch (s.phase) {
+    case 'lobby': return lobbyTick(s, inp);
+    case 'deal': return dealTick(s, inp);
+    case 'night': return nightTick(s, inp);
+    case 'day': return dayTick(s, inp);
+    case 'vote': return voteTick(s, inp);
+    case 'result': if (sayDone(s, T(9000))) { startNight(s); return true; } return false;
+    default: return false;
+  }
+}
+function lobbyTick(s, inp) {
+  let ch = false;
+  for (const pid in Net.inputs) {
+    const i = inp(pid); if (!i) continue;
+    const p = byPid(s, pid);
+    if (i.leave) { if (p) { s.players = s.players.filter(x => x.pid !== pid); ch = true; } continue; }
+    if (s.kicked && s.kicked[pid] && i.ts <= s.kicked[pid]) continue;
+    const name = cleanName(i.name); if (!name) continue;
+    const clash = s.players.some(x => x.pid !== pid && x.name.toLowerCase() === name.toLowerCase());
+    if (!p) { if (!clash && s.players.length < 24) { s.players.push({ pid, name, alive: true }); ch = true; } }
+    else if (p.name !== name && !clash) { p.name = name; ch = true; }
+  }
+  if (ch && s.cfg.auto) Object.assign(s.cfg, defaultCfg(s.players.length));
+  return ch;
+}
+function hostDeal(s) {
+  if (cfgProblems(s.cfg, s.players.length).length) return false;
+  const deck = buildDeck(s.players.length, s.cfg); const did = rid(6);
+  s.deal = { id: did, deck: deck.map(r => enc(r, did)), owners: deck.map(() => null), seer: !!s.cfg.seer, doctor: !!s.cfg.doctor };
+  for (const p of s.players) { p.alive = true; p.card = null; p.role = null; p.ready = false; p.died = null; }
+  s.round = 0; s.night = {}; s.news = null; s.result = null; s.winner = null; s.seerLog = []; s.ready = []; s.voted = [];
+  go(s, 'deal', 'pick', 'Welcome to Werewolf. Everyone, pick a card on your phone and memorise your role. Don’t let anyone see your screen. Tap ready when you’re done.');
+}
+function dealTick(s, inp) {
+  let ch = false;
+  const claims = s.players.map(p => ({ p, i: inp(p.pid) }))
+    .filter(x => x.i && x.i.claim && x.i.claim.d === s.deal.id && x.p.card == null)
+    .sort((a, b) => a.i.ts - b.i.ts);
+  for (const { p, i } of claims) {
+    const c = i.claim.c;
+    if (Number.isInteger(c) && c >= 0 && c < s.deal.owners.length && !s.deal.owners[c]) {
+      s.deal.owners[c] = p.pid; p.card = c; p.role = s.deal.deck[c]; ch = true;
+    }
+  }
+  for (const p of s.players) {
+    const i = inp(p.pid);
+    const r = p.card != null && !!i && i.rdy === s.deal.id;
+    if (!!p.ready !== r) { p.ready = r; ch = true; }
+  }
+  if (s.players.length && s.players.every(p => p.ready) && sayDone(s, T(800))) { startNight(s); return true; }
+  return ch;
+}
+function startNight(s) {
+  s.round = (s.round || 0) + 1;
+  const lastDoc = (s.night && s.night.doc) || null;
+  s.night = { lastDoc, wolf: null, seer: null, doc: null, picks: {}, fake: 0 };
+  s.ready = []; s.voted = []; s.allInAt = null;
+  go(s, 'night', 'close', s.round === 1
+    ? 'Night falls on the village. Everyone, close your eyes and keep them closed.'
+    : `Night ${s.round}. Everyone, close your eyes.`);
+}
+function nextRole(s, from) {
+  const order = ['seer', 'doctor'];
+  for (let k = order.indexOf(from); k < order.length; k++) {
+    const r = order[k];
+    if (s.deal && s.deal[r]) { enterRole(s, r); return; }
+  }
+  dawn(s);
+}
+function enterRole(s, r) {
+  const living = aliveOf(s).some(p => roleOf(s, p) === r);
+  // A role that is out (or was never dealt) is still called, with a believable pause, so timing gives nothing away.
+  s.night.fake = living ? 0 : T(6000 + Math.floor(Math.random() * 7000));
+  go(s, 'night', r, r === 'seer'
+    ? 'Seer, open your eyes. Choose one person, and you will learn whether they are a werewolf.'
+    : 'Doctor, open your eyes. Choose one person to protect tonight.');
+}
+function nightTick(s, inp) {
+  const N = s.night; const alive = aliveOf(s);
+  const holder = r => alive.find(p => roleOf(s, p) === r);
+  switch (s.step) {
+    case 'close':
+      if (sayDone(s, T(3000))) {
+        N.picks = {};
+        go(s, 'night', 'wolf', s.round === 1
+          ? 'Werewolves, open your eyes. Look around to find your fellow werewolves. Then, on your phone, agree on one person to eliminate.'
+          : 'Werewolves, open your eyes. On your phone, agree on one person to eliminate.');
+        return true;
+      }
+      return false;
+    case 'wolf': {
+      const wolves = alive.filter(p => roleOf(s, p) === 'wolf');
+      const k = key(s, 'wolf'); const picks = {};
+      for (const w of wolves) { const i = inp(w.pid); const a = i && i.act; if (a && a.k === k && validWolfTarget(s, a.t)) picks[w.pid] = { t: a.t, c: !!a.c }; }
+      let ch = false;
+      if (!same(picks, N.picks || {})) { N.picks = picks; ch = true; }
+      const vals = wolves.map(w => picks[w.pid]);
+      if (wolves.length && sayDone(s) && vals.every(v => v && v.c) && vals.every(v => v.t === vals[0].t)) {
+        N.wolf = vals[0].t; go(s, 'night', 'wolfc', 'Werewolves, close your eyes.'); return true;
+      }
+      return ch;
+    }
+    case 'wolfc': if (sayDone(s, T(2500))) { nextRole(s, 'seer'); return true; } return false;
+    case 'seer': {
+      const seer = holder('seer');
+      if (!seer) { if (sayDone(s, N.fake || T(8000))) { go(s, 'night', 'seerc', 'Seer, close your eyes.'); return true; } return false; }
+      const i = inp(seer.pid); const a = i && i.act;
+      if (a && a.k === key(s, 'seer') && a.x && validTarget(s, a.t, seer.pid) && sayDone(s)) {
+        N.seer = a.t;
+        s.seerLog = (s.seerLog || []).concat([{ r: s.round, t: a.t }]);
+        go(s, 'night', 'seerc', 'Seer, close your eyes.'); return true;
+      }
+      return false;
+    }
+    case 'seerc': if (sayDone(s, T(2500))) { nextRole(s, 'doctor'); return true; } return false;
+    case 'doctor': {
+      const doc = holder('doctor');
+      if (!doc) { if (sayDone(s, N.fake || T(8000))) { go(s, 'night', 'doctorc', 'Doctor, close your eyes.'); return true; } return false; }
+      const i = inp(doc.pid); const a = i && i.act;
+      if (a && a.k === key(s, 'doctor') && a.c && validDocTarget(s, a.t) && sayDone(s)) {
+        N.doc = a.t; go(s, 'night', 'doctorc', 'Doctor, close your eyes.'); return true;
+      }
+      return false;
+    }
+    case 'doctorc': if (sayDone(s, T(2500))) { dawn(s); return true; } return false;
+  }
+  return false;
+}
+function dawn(s) {
+  const N = s.night; let killed = null;
+  if (N.wolf && N.wolf !== N.doc) {
+    const p = byPid(s, N.wolf);
+    if (p && p.alive) { p.alive = false; p.died = { r: s.round, how: 'night' }; killed = p.pid; }
+  }
+  s.news = { r: s.round, killed };
+  let text;
+  if (killed) { const p = byPid(s, killed); text = `Everyone, open your eyes. It’s morning. Last night, ${p.name} was killed by the werewolves. ${p.name} was ${article(roleOf(s, p))}.`; }
+  else text = 'Everyone, open your eyes. It’s morning, and good news: nobody died last night.';
+  const w = winner(s);
+  if (w) { finish(s, w, text); return; }
+  s.ready = [];
+  go(s, 'day', 'talk', text + ' Now discuss who you think the werewolves are. When you’re ready to vote, tap Ready to vote on your phone.');
+}
+function dayTick(s, inp) {
+  const alive = aliveOf(s); const k = key(s, 'vr');
+  const ready = alive.filter(p => { const i = inp(p.pid); return i && i.vr === k; }).map(p => p.pid);
+  let ch = false;
+  if (!same(ready, s.ready || [])) { s.ready = ready; ch = true; }
+  if (alive.length && ready.length === alive.length && sayDone(s)) { startVote(s); return true; }
+  return ch;
+}
+function startVote(s) {
+  s.voted = []; s.allInAt = null;
+  go(s, 'vote', 'cast', 'Everyone is ready. Time to vote. On your phone, choose who you want to eliminate. You can change your vote until everyone has voted.');
+}
+function currentVotes(s, inp) {
+  const k = key(s, 'vote'); const votes = {};
+  for (const p of aliveOf(s)) {
+    const i = inp(p.pid); const v = i && i.vote;
+    if (v && v.k === k && (v.t === 'skip' || validTarget(s, v.t, p.pid))) votes[p.pid] = v.t;
+  }
+  return votes;
+}
+function voteTick(s, inp) {
+  const alive = aliveOf(s); const votes = currentVotes(s, inp);
+  let ch = false;
+  const voted = alive.map(p => p.pid).filter(pid => votes[pid]);
+  if (!same(voted, s.voted || [])) { s.voted = voted; ch = true; }
+  if (alive.length && voted.length === alive.length) {
+    if (!s.allInAt) { s.allInAt = now(); ch = true; }
+    else if (now() - s.allInAt >= T(1500) && sayDone(s)) { tally(s, votes); return true; }
+  } else if (s.allInAt) { s.allInAt = null; ch = true; }
+  return ch;
+}
+function tally(s, votes) {
+  const count = {}; for (const t of Object.values(votes)) count[t] = (count[t] || 0) + 1;
+  const ent = Object.entries(count).sort((a, b) => b[1] - a[1]);
+  const tie = ent.length > 1 && ent[0][1] === ent[1][1];
+  let out = null; if (ent.length && !tie && ent[0][0] !== 'skip') out = ent[0][0];
+  s.result = { r: s.round, votes, out, tie };
+  let text;
+  if (out) {
+    const p = byPid(s, out); p.alive = false; p.died = { r: s.round, how: 'vote' };
+    text = `The votes are in. With ${ent[0][1]} vote${ent[0][1] === 1 ? '' : 's'}, the village has voted out ${p.name}. ${p.name} was ${article(roleOf(s, p))}.`;
+  } else if (tie) text = 'The votes are in. It’s a tie, so nobody is eliminated today.';
+  else text = 'The votes are in. The village chose not to eliminate anyone today.';
+  const w = winner(s);
+  if (w) { finish(s, w, text); return; }
+  go(s, 'result', 'show', text + ' Night will fall shortly.');
+}
+function finish(s, w, prefix) {
+  s.winner = w;
+  const wolves = s.players.filter(p => roleOf(s, p) === 'wolf').map(p => p.name);
+  const wt = wolves.length === 1 ? `The werewolf was ${wolves[0]}.` : `The werewolves were ${listJoin(wolves)}.`;
+  const msg = w === 'village' ? 'All the werewolves are gone. The villagers win!' : 'The werewolves now match the villagers. The werewolves win!';
+  go(s, 'over', 'end', `${prefix ? prefix + ' ' : ''}${msg} ${wt}`);
+}
+function toLobby(s) {
+  for (const p of s.players) { p.alive = true; p.card = null; p.role = null; p.ready = false; p.died = null; }
+  s.deal = null; s.winner = null; s.round = 0; s.night = {}; s.news = null; s.result = null; s.seerLog = []; s.ready = []; s.voted = [];
+  go(s, 'lobby', '', null);
+}
+function removePlayer(s, pid) {
+  const p = byPid(s, pid); if (!p) return false;
+  if (s.phase === 'lobby' || (s.phase === 'deal' && p.card == null)) {
+    s.players = s.players.filter(x => x.pid !== pid);
+    s.kicked = Object.assign({}, s.kicked, { [pid]: (Net.inputs[pid] && Net.inputs[pid].ts) || now() });
+    if (s.phase === 'lobby' && s.cfg.auto) Object.assign(s.cfg, defaultCfg(s.players.length));
+    return;
+  }
+  if (!p.alive) return false;
+  p.alive = false; p.died = { r: s.round, how: 'left' };
+  if (s.phase !== 'over') { const w = winner(s); if (w) finish(s, w, `${p.name} has left the game.`); }
+}
+function forceLabel(s) {
+  return { deal: 'Start without waiting', night: 'Skip this step', day: 'Start the vote now', vote: 'Close voting now', result: 'Skip to night' }[s.phase] || null;
+}
+function force(s) {
+  const inp = inputFor(s); const N = s.night || {};
+  Narrator.stop();
+  switch (s.phase) {
+    case 'deal': {
+      s.players = s.players.filter(p => p.card != null);
+      if (!s.players.length) return false;
+      startNight(s);
+      const w = winner(s); if (w) finish(s, w, '');
+      return;
+    }
+    case 'night':
+      switch (s.step) {
+        case 'close': N.picks = {}; go(s, 'night', 'wolf', 'Werewolves, open your eyes. On your phone, agree on one person to eliminate.'); return;
+        case 'wolf': {
+          const cnt = {}; for (const v of Object.values(N.picks || {})) cnt[v.t] = (cnt[v.t] || 0) + 1;
+          const best = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+          N.wolf = best ? best[0] : null; go(s, 'night', 'wolfc', 'Werewolves, close your eyes.'); return;
+        }
+        case 'wolfc': nextRole(s, 'seer'); return;
+        case 'seer': go(s, 'night', 'seerc', 'Seer, close your eyes.'); return;
+        case 'seerc': nextRole(s, 'doctor'); return;
+        case 'doctor': {
+          const d = aliveOf(s).find(p => roleOf(s, p) === 'doctor'); const i = d && inp(d.pid); const a = i && i.act;
+          if (a && a.k === key(s, 'doctor') && validDocTarget(s, a.t)) N.doc = a.t;
+          go(s, 'night', 'doctorc', 'Doctor, close your eyes.'); return;
+        }
+        case 'doctorc': dawn(s); return;
+      }
+      return false;
+    case 'day': startVote(s); return;
+    case 'vote': tally(s, currentVotes(s, inp)); return;
+    case 'result': startNight(s); return;
+  }
+  return false;
+}
+
+/* ================= practice bots (run on the narrator device) ================= */
+const BOT_NAMES = ['Ava', 'Bo', 'Cleo', 'Dax', 'Eve', 'Finn', 'Gus', 'Ivy', 'Jo', 'Kit'];
+const isBot = pid => typeof pid === 'string' && pid.startsWith('bot-');
+const Bots = {
+  last: {},
+  hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; },
+  delay(pid, salt, min, span) { return T(min + this.hash(pid + salt) % span); },
+  pick(list, pid, salt) { return list.length ? list[this.hash(pid + salt) % list.length] : null; },
+  add(s, n) {
+    const used = new Set(s.players.map(p => p.name.toLowerCase()));
+    let added = 0;
+    for (const nm0 of BOT_NAMES) {
+      if (added >= n) break;
+      const name = nm0 + ' 🤖';
+      if (used.has(name.toLowerCase())) continue;
+      const pid = 'bot-' + rid(6);
+      s.players.push({ pid, name, alive: true }); added++;
+      this.set(pid, { pid, name, gid: s.gid });
+    }
+    if (s.cfg.auto) Object.assign(s.cfg, defaultCfg(s.players.length));
+  },
+  set(pid, inp) {
+    const prev = this.last[pid] || {};
+    const next = Object.assign({}, prev, inp, { pid });
+    if (same(Object.assign({}, prev, { ts: 0 }), Object.assign({}, next, { ts: 0 }))) return false;
+    next.ts = Math.max(now(), (prev.ts || 0) + 1);
+    this.last[pid] = next; mergeInput(next); return true;
+  },
+  act(s) {   // decides what every bot does right now; returns true if any bot changed its mind
+    let ch = false;
+    const el_ = now() - s.stepAt;
+    for (const p of s.players) {
+      if (!isBot(p.pid)) continue;
+      const pid = p.pid; const r = roleOf(s, p);
+      const base = { pid, name: p.name, gid: s.gid };
+      if (!this.last[pid]) ch = this.set(pid, base) || ch;
+      if (s.phase === 'deal' && s.deal) {
+        if (p.card == null && el_ > this.delay(pid, 'claim' + s.deal.id, 1200, 3500)) {
+          const free = s.deal.owners.map((o, i) => o ? -1 : i).filter(i => i >= 0);
+          const c = this.pick(free, pid, 'c' + el_);
+          if (c != null) ch = this.set(pid, { claim: { d: s.deal.id, c } }) || ch;
+        }
+        if (p.card != null && el_ > this.delay(pid, 'rdy' + s.deal.id, 2500, 4000)) ch = this.set(pid, { rdy: s.deal.id }) || ch;
+      }
+      if (!p.alive) continue;
+      const others = s.players.filter(x => x.alive && x.pid !== pid);
+      const salt = s.deal ? s.deal.id + s.round + s.phase + s.step : '';
+      if (s.phase === 'night' && s.step === r && el_ > this.delay(pid, salt, 2500, 4000)) {
+        const k = key(s, r);
+        if (r === 'wolf') {
+          const pack = s.players.filter(x => x.alive && roleOf(s, x) === 'wolf');
+          const human = pack.find(x => !isBot(x.pid) && s.night.picks && s.night.picks[x.pid]);
+          const victims = s.players.filter(x => x.alive && roleOf(s, x) !== 'wolf').map(x => x.pid);
+          const leader = pack.find(x => isBot(x.pid));
+          const t = human ? s.night.picks[human.pid].t : this.pick(victims, leader ? leader.pid : pid, salt);
+          if (t) ch = this.set(pid, { act: { k, t, c: true } }) || ch;
+        } else if (r === 'seer') {
+          const t = this.pick(others.map(x => x.pid), pid, salt);
+          if (t) ch = this.set(pid, { act: { k, t, c: true, x: true } }) || ch;
+        } else if (r === 'doctor') {
+          const opts = s.players.filter(x => x.alive && x.pid !== (s.night && s.night.lastDoc)).map(x => x.pid);
+          const t = this.pick(opts, pid, salt);
+          if (t) ch = this.set(pid, { act: { k, t, c: true } }) || ch;
+        }
+      }
+      if (s.phase === 'day' && el_ > this.delay(pid, salt, 4000, 6000)) ch = this.set(pid, { vr: key(s, 'vr') }) || ch;
+      if (s.phase === 'vote' && el_ > this.delay(pid, salt, 1500, 4500)) {
+        const wolf = r === 'wolf';
+        const pool = others.filter(x => !(wolf && roleOf(s, x) === 'wolf')).map(x => x.pid);
+        const t = this.pick(pool, pid, salt);
+        if (t) ch = this.set(pid, { vote: { k: key(s, 'vote'), t } }) || ch;
+      }
+    }
+    return ch;
+  },
+};
+
+/* ================= actions ================= */
+async function hostCreate() {
+  Narrator.prime();
+  if (S.busy) return; S.busy = true; render();
+  try {
+    leaveRoom();
+    const code = await createRoom(Net.B, GAME_ID);
+    await enterRoom(code, { created: true });
+    const s = {
+      v: 1, ver: 0, gid: rid(6), host: myPid, phase: 'lobby', step: '', stepAt: now(), say: null,
+      players: [], cfg: Object.assign({ auto: true }, defaultCfg(0)), kicked: {}, round: 0, deal: null, night: {},
+      news: null, result: null, winner: null, seerLog: [], ready: [], voted: [],
+    };
+    publishState(s); Host.start();
+  } catch (e) {
+    console.error(e); toast('Couldn’t create a room. Check your connection and try again.');
+  } finally { S.busy = false; render(); }
+}
+async function joinCode(raw) {
+  const code = normCode(raw); if (code.length !== 4) return;
+  S.busy = true; render();
+  await enterRoom(code);
+  S.busy = false; render();
+}
+function takeover() {
+  ask('Narrate from this device?', 'This device will speak the commands and run the game from now on. Keep it on, with the volume up.', 'Narrate here', () => {
+    Narrator.prime(); const s = clone(Net.state); s.host = myPid; publishState(s); Host.start();
+  });
+}
+function joinClick(s) {
+  const name = cleanName(S.nameDraft); if (!name) return;
+  store.set('ww_name', name);
+  const taken = s.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (taken && taken.pid !== myPid) {
+    ask(`Rejoin as ${taken.name}?`, 'Only do this if you are this player and you reloaded the page or switched phones.', 'Rejoin', () => adoptPid(taken, s));
+    return;
+  }
+  keepAwake(); S.joinAt = now();
+  sendInput({ name, gid: s.gid, leave: false });
+}
+function adoptPid(p, s) {
+  if (Net.B && Net.code) Net.B.presence(`${base()}/presence/${myPid}`, null);
+  lastPresence = null;
+  myPid = p.pid; store.set('ww_pid', myPid, true); myInput = { pid: myPid };
+  S.joinAt = now(); keepAwake();
+  sendInput({ name: p.name, gid: s.gid, leave: false, rdy: s.deal ? s.deal.id : null });
+}
+function ask(title, text, yes, fn) { S.confirm = { title, text, yes, fn }; render(); }
+let toastT = null;
+function toast(msg) { S.toast = msg; render(); clearTimeout(toastT); toastT = setTimeout(() => { S.toast = ''; render(); }, 4200); }
+function setCfg(patch) { hostAct(s => { s.cfg = Object.assign({}, s.cfg, patch, { auto: false }); }); }
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast('Link copied'); } catch (e) { toast('Copy failed. Long-press the link to copy it.'); }
+}
+
+/* ================= rendering ================= */
+let rq = false;
+function render() { if (rq) return; rq = true; requestAnimationFrame(() => { rq = false; draw(); }); }
+function theme(s) {
+  if (!s) return 'dusk';
+  if (s.phase === 'night') return 'night';
+  if (s.phase === 'day' || s.phase === 'vote' || s.phase === 'result') return 'day';
+  return 'dusk';
+}
+const STATS = { draws: 0, ticks: 0, says: 0 };
+function draw() {
+  STATS.draws++;
+  const s = Net.state;
+  const me = s ? byPid(s, myPid) : null;
+  document.body.className = theme(s);
+  const root = el('div', { class: 'wrap' },
+    header(s, me), hostBar(s), main(s, me), footer(s), modal(),
+    S.toast ? el('div', { class: 'toast', role: 'status' }, S.toast) : null);
+  const app = document.getElementById('app');
+  if (app.firstElementChild && app.firstElementChild.classList.contains('wrap') && app.__live) morph(app.firstElementChild, root);
+  else { app.replaceChildren(root); app.__live = true; }
+}
+function header(s, me) {
+  let chip = '';
+  if (s) chip = { lobby: 'Lobby', deal: 'Dealing', night: `Night ${s.round}`, day: `Day ${s.round}`, vote: `Day ${s.round} · Vote`, result: `Day ${s.round}`, over: 'Game over' }[s.phase] || '';
+  return el('header', { class: 'top' },
+    el('a', { class: 'brand', href: PREVIEW ? '#' : withLocal('/') }, el('span', { class: 'moon' }), 'Werewolf'),
+    chip ? el('span', { class: 'chip' }, chip) : null,
+    me ? el('span', { class: 'me' }, me.name + (s.phase !== 'lobby' && me.alive === false ? ' · out' : '')) : null);
+}
+function narr(s) {
+  if (!s || !s.say || Host.active) return null;
+  return el('div', { class: 'narr' }, el('span', { class: 'narr-ico' }, '🎙'), el('span', {}, s.say.text));
+}
+function stepLabel(s) {
+  if (s.phase === 'night') return { close: 'Night begins', wolf: 'Werewolves’ turn', wolfc: 'Werewolves sleep', seer: 'Seer’s turn', seerc: 'Seer sleeps', doctor: 'Doctor’s turn', doctorc: 'Doctor sleeps' }[s.step] || 'Night';
+  return { lobby: 'Lobby', deal: 'Picking cards', day: 'Discussion', vote: 'Voting', result: 'Vote result', over: 'Game over' }[s.phase] || '';
+}
+function progress(s) {
+  const a = aliveOf(s).length;
+  if (s.phase === 'lobby') return `${s.players.length} joined`;
+  if (s.phase === 'deal') return `${s.players.filter(p => p.ready).length}/${s.players.length} ready`;
+  if (s.phase === 'day') return `${(s.ready || []).length}/${a} ready to vote`;
+  if (s.phase === 'vote') return `${(s.voted || []).length}/${a} voted`;
+  return '';
+}
+function hostLooksOffline(s) {
+  if (s.phase === 'over') return false;
+  return Net.connected && !Net.hostOnline && now() - Math.max(Net.hostSeen, Net.enteredAt) > 15000;
+}
+function hostBar(s) {
+  if (!s) return null;
+  if (!Host.active) {
+    if (s.host === myPid) return el('div', { class: 'hostbar resume' }, el('span', {}, '🎙 This device is the narrator.'), el('button', { class: 'btn primary sm', onclick: () => Host.start() }, 'Resume narrating'));
+    if (hostLooksOffline(s)) return el('div', { class: 'hostbar warn' }, el('span', {}, 'The narrator device looks offline.'), el('button', { class: 'btn sm', onclick: takeover }, 'Narrate here'));
+    return null;
+  }
+  const prog = progress(s); const fl = forceLabel(s);
+  return el('div', { class: 'hostbar' },
+    el('div', { class: 'hb-top' },
+      el('span', { class: 'hb-mic' + (Narrator.speakingId ? ' on' : ''), title: 'Narrator' }, Narrator.which() === 'off' ? '🔇' : '🎙'),
+      el('div', { class: 'hb-txt' },
+        el('div', { class: 'hb-label' }, `Narrator · Room ${Net.code} · ${stepLabel(s)}${prog ? ' · ' + prog : ''}`),
+        el('div', { class: 'hb-say' }, s.say ? s.say.text : (s.phase === 'lobby' ? 'Waiting for players to join.' : ''))),
+      el('button', { class: 'icon-btn', 'aria-label': S.hostOpen ? 'Collapse' : 'Expand', onclick: () => { S.hostOpen = !S.hostOpen; render(); } }, S.hostOpen ? '▴' : '▾')),
+    S.hostOpen ? el('div', { class: 'hb-actions' },
+      s.say ? el('button', { class: 'btn sm ghost', onclick: () => Narrator.repeat() }, '↻ Repeat') : null,
+      fl ? el('button', { class: 'btn sm ghost', onclick: () => ask(fl + '?', forceHelp(s), fl, () => hostAct(force)) }, '⏭ ' + fl) : null,
+      el('button', { class: 'btn sm ghost', onclick: () => { S.panel = S.panel === 'voice' ? null : 'voice'; render(); } }, '🔊 Voice'),
+      s.phase !== 'lobby' ? el('button', { class: 'btn sm ghost', onclick: () => { S.panel = S.panel === 'players' ? null : 'players'; render(); } }, '👥 Players') : null,
+      s.phase !== 'lobby' ? el('button', { class: 'btn sm ghost', onclick: () => ask('End this game?', 'Everyone goes back to the lobby. Roles are cleared.', 'End game', () => hostAct(toLobby)) }, '■ End game') : null,
+    ) : null,
+    S.hostOpen && S.panel === 'voice' ? voicePanel() : null,
+    S.hostOpen && S.panel === 'players' && s.phase !== 'lobby' ? managePanel(s) : null);
+}
+function forceHelp(s) {
+  return {
+    deal: 'Anyone who hasn’t picked a card sits out this game.',
+    night: 'Moves on without waiting. If the werewolves haven’t agreed, their most-picked target is used.',
+    day: 'Starts voting even though not everyone tapped Ready.',
+    vote: 'Counts the votes cast so far.',
+    result: 'Goes straight to night.',
+  }[s.phase] || '';
+}
+function voicePanel() {
+  const on = Narrator.which() === 'device';
+  const vs = Narrator.voices(); const cur = Narrator.pickVoice();
+  return el('div', { class: 'panel' },
+    el('div', { class: 'seg' },
+      el('button', { class: on ? 'on' : '', disabled: window.speechSynthesis ? null : true, onclick: () => { Narrator.engine = 'device'; store.set('ww_voice_on', 'on'); Narrator.prime(); render(); } }, 'Speak out loud'),
+      el('button', { class: on ? '' : 'on', onclick: () => { Narrator.engine = 'off'; store.set('ww_voice_on', 'off'); Narrator.stop(); render(); } }, 'Silent (text only)')),
+    on && vs.length > 1 ? el('select', { class: 'select', 'aria-label': 'Voice', onchange: e => { Narrator.voiceName = e.target.value; store.set('ww_voice', e.target.value); Narrator.test(); } },
+      vs.map(v => el('option', { value: v.name, selected: !!(cur && cur.name === v.name) }, `${v.name} (${v.lang})`))) : null,
+    el('div', { class: 'row' },
+      el('p', { class: 'small muted' }, window.speechSynthesis ? 'Only this device speaks. Turn the volume up and keep the screen on.' : 'This browser can’t speak. Players can read each command on their phones.'),
+      el('button', { class: 'btn sm', onclick: () => Narrator.test() }, 'Test')));
+}
+function managePanel(s) {
+  const list = s.players.filter(p => p.alive || (s.phase === 'deal' && p.card == null));
+  return el('div', { class: 'panel' },
+    el('p', { class: 'small muted' }, 'If someone has to leave, remove them so the game doesn’t wait for them.'),
+    list.map(p => el('div', { class: 'prow' },
+      el('span', { class: 'dot ' + (Net.online.has(p.pid) ? 'on' : 'off') }),
+      el('span', { class: 'pn' }, p.name),
+      el('button', { class: 'btn sm ghost', onclick: () => ask(`Remove ${p.name}?`, s.phase === 'deal' ? 'They will sit out this game.' : 'They will be out of the game. Their role stays secret.', 'Remove', () => hostAct(x => removePlayer(x, p.pid))) }, 'Remove'))));
+}
+function main(s, me) {
+  if (Net.mode === 'connecting') return loadingView('Connecting…');
+  if (Net.mode === 'unconfigured') return unconfiguredView();
+  if (Net.mode === 'error') return [hero(), el('section', { class: 'card center' }, el('p', {}, 'Couldn’t connect. Check your internet and reload the page.'))];
+  if (!Net.code || Net.room === 'missing' || Net.room === 'error') return startView();
+  if (Net.room === 'loading' || !Net.gotState) return loadingView(`Opening room ${Net.code}…`);
+  if (!s) return [el('section', { class: 'card center' }, el('h2', {}, `Room ${Net.code}`), el('p', { class: 'muted' }, 'This room has no game yet. The narrator device will set it up.'))];
+  switch (s.phase) {
+    case 'lobby': return lobbyView(s, me);
+    case 'deal': return dealView(s, me);
+    case 'night': return [roleBar(s, me), nightView(s, me)];
+    case 'day': return [roleBar(s, me), dayView(s, me)];
+    case 'vote': return [roleBar(s, me), voteView(s, me)];
+    case 'result': return [roleBar(s, me), resultView(s, me)];
+    case 'over': return overView(s, me);
+  }
+  return startView();
+}
+function loadingView(msg) { return el('div', { class: 'loading' }, el('div', { class: 'moon-big pulse' }), el('p', { class: 'muted' }, msg)); }
+function hero() {
+  return el('section', { class: 'hero' },
+    el('div', { class: 'moon-big' }),
+    el('h1', {}, 'Werewolf'),
+    el('p', {}, 'For 5–15 people in the same room. Everyone plays on their own phone, and one device narrates out loud, so nobody has to sit out as game master.'));
+}
+function unconfiguredView() {
+  return [hero(), el('section', { class: 'card' },
+    el('h3', {}, 'Almost ready'),
+    el('p', {}, 'Live sync isn’t set up on this site yet. Add your Firebase database URL to shared/firebase-config.js (the README has the steps), then redeploy.'),
+    el('a', { class: 'btn big', href: location.pathname + '?local=1' }, 'Try test mode (tabs in this browser only)'))];
+}
+function startView() {
+  const code = normCode(S.codeDraft);
+  if (PREVIEW) return [hero(),
+    el('section', { class: 'card' },
+      el('h3', {}, 'Preview'),
+      el('p', {}, 'This preview runs on this one device. Host a game, type your name to join as a player, tap “Add bots” to fill the other seats, then deal. Turn your volume up to hear the narrator.'),
+      el('p', { class: 'muted small' }, 'On the real site, everyone joins from their own phone with the room code or QR code.'),
+      el('button', { class: 'btn primary big', disabled: S.busy ? true : null, onclick: hostCreate }, '🎙 Host a game'))];
+  return [hero(),
+    Net.room === 'missing' ? el('section', { class: 'card' }, el('p', {}, `Room ${Net.code} wasn’t found. Check the code with the narrator, or host a new game.`)) : null,
+    Net.room === 'error' ? el('section', { class: 'card' }, el('p', {}, 'Couldn’t open that room. Check your connection and try again.')) : null,
+    el('section', { class: 'card' },
+      el('h3', {}, 'Join a game'),
+      el('label', { for: 'code', class: 'lbl' }, 'Room code (on the narrator’s screen)'),
+      el('input', { id: 'code', class: 'input code-input', maxlength: '4', placeholder: 'ABCD', value: S.codeDraft, autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', enterkeyhint: 'go',
+        oninput: e => { S.codeDraft = normCode(e.target.value); render(); }, onkeydown: e => { if (e.key === 'Enter') joinCode(S.codeDraft); } }),
+      el('button', { class: 'btn primary big', disabled: code.length === 4 && !S.busy ? null : true, onclick: () => joinCode(S.codeDraft) }, S.busy ? 'Opening…' : 'Join')),
+    el('section', { class: 'card' },
+      el('h3', {}, 'Host a game'),
+      el('ol', { class: 'steps' },
+        el('li', {}, 'The host device becomes the narrator and speaks every command. Put it in the middle, volume up.'),
+        el('li', {}, 'Everyone scans the QR code or opens the link, then types their name.'),
+        el('li', {}, 'Pick a face-down card, memorise your role, tap Ready.'),
+        el('li', {}, 'Follow the voice: close your eyes at night, act on your phone when your role is called.'),
+        el('li', {}, 'By day, discuss, tap Ready to vote, then vote someone out.')),
+      el('button', { class: 'btn big', disabled: S.busy ? true : null, onclick: hostCreate }, '🎙 Host a new game on this device'))];
+}
+function shareCard(s) {
+  if (PREVIEW) return el('section', { class: 'card' },
+    el('div', { class: 'small muted' }, 'Room code'), el('div', { class: 'code' }, Net.code),
+    el('p', { class: 'small muted' }, 'Preview: on the real site this card shows a QR code and link for everyone to join.'));
+  const url = roomUrl();
+  let qr = null;
+  if (QR && Host.active) {
+    try { const q = QR(0, 'M'); q.addData(url); q.make(); qr = el('div', { class: 'qr', 'aria-label': 'QR code to join' }); qr.__html = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); qr.innerHTML = qr.__html; } catch (e) { qr = null; }
+  }
+  return el('section', { class: 'card' },
+    el('div', { class: 'share-row' },
+      el('div', {},
+        el('div', { class: 'small muted' }, 'Room code'),
+        el('div', { class: 'code' }, Net.code),
+        el('div', { class: 'small muted' }, Host.active ? 'Players scan the code or open the link' : 'Share this with anyone still joining')),
+      qr),
+    el('div', { class: 'small muted link-text' }, url.replace(/^https?:\/\//, '')),
+    el('div', { class: 'row gap', style: 'justify-content:flex-start;margin-top:10px' },
+      navigator.share ? el('button', { class: 'btn sm', onclick: () => navigator.share({ title: 'Join our Werewolf game', text: `Room ${Net.code}`, url }).catch(() => {}) }, 'Share link') : null,
+      el('button', { class: 'btn sm', onclick: () => copy(url) }, 'Copy link')));
+}
+function lobbyView(s, me) {
+  const out = [shareCard(s)];
+  if (!me) {
+    const pending = myInput.gid === s.gid && !myInput.leave && !!cleanName(myInput.name);
+    const kicked = !!(s.kicked && s.kicked[myPid] && (myInput.ts || 0) <= s.kicked[myPid]);
+    const waiting = pending && !kicked;
+    const draft = cleanName(S.nameDraft);
+    const taken = draft ? s.players.find(p => p.name.toLowerCase() === draft.toLowerCase()) : null;
+    out.push(el('section', { class: 'card' },
+      el('h2', {}, Host.active ? 'Playing too?' : 'Join the game'),
+      Host.active ? el('p', { class: 'muted small', style: 'margin-bottom:6px' }, 'If this device is also a player, add your name. Otherwise skip this.') : null,
+      el('label', { for: 'name', class: 'lbl' }, 'Your name'),
+      el('input', { id: 'name', class: 'input', maxlength: '18', placeholder: 'Type your name', value: S.nameDraft, autocomplete: 'off', autocapitalize: 'words', enterkeyhint: 'go',
+        oninput: e => { S.nameDraft = e.target.value; render(); }, onkeydown: e => { if (e.key === 'Enter') joinClick(s); } }),
+      taken ? el('p', { class: 'hint warn' }, `${taken.name} is already in. Pick another name, or tap Rejoin if that’s you on a new device.`) : null,
+      el('button', { class: 'btn primary big', disabled: !draft || (waiting && !taken) ? true : null, onclick: () => joinClick(s) },
+        taken ? `Rejoin as ${taken.name}` : (waiting ? 'Joining…' : 'Join game')),
+      waiting && now() - S.joinAt > 10000 ? el('p', { class: 'hint' }, 'Still waiting for the narrator device to add you. Make sure it’s open.') : null,
+      kicked ? el('p', { class: 'hint' }, 'The narrator removed you. You can join again.') : null));
+  } else {
+    out.push(el('section', { class: 'card' },
+      el('div', { class: 'row' },
+        el('div', {}, el('div', { class: 'small muted' }, 'You’re in as'), el('div', { class: 'big-name' }, me.name)),
+        el('button', { class: 'btn sm ghost', onclick: () => sendInput({ leave: true }) }, 'Leave'))));
+  }
+  out.push(playersCard(s, 'lobby'));
+  if (Host.active) out.push(rolesCard(s));
+  else if (me) out.push(el('p', { class: 'center muted' }, 'Waiting for the narrator to deal the cards…'));
+  return out;
+}
+function stepper(label, val, onset, min, max) {
+  return el('div', { class: 'opt' }, el('span', {}, label),
+    el('div', { class: 'stepper' },
+      el('button', { 'aria-label': 'Fewer', disabled: val <= min ? true : null, onclick: () => onset(val - 1) }, '−'),
+      el('b', {}, String(val)),
+      el('button', { 'aria-label': 'More', disabled: val >= max ? true : null, onclick: () => onset(val + 1) }, '+')));
+}
+function toggle(label, on, onset) {
+  return el('div', { class: 'opt' }, el('span', {}, label),
+    el('button', { class: 'switch' + (on ? ' on' : ''), role: 'switch', 'aria-checked': on ? 'true' : 'false', 'aria-label': label, onclick: () => onset(!on) }));
+}
+function rolesCard(s) {
+  const n = s.players.length; const c = s.cfg;
+  const vill = Math.max(0, n - c.wolves - (c.seer ? 1 : 0) - (c.doctor ? 1 : 0));
+  const probs = cfgProblems(c, n);
+  return el('section', { class: 'card' },
+    el('h3', {}, 'Roles'),
+    stepper('🐺 Werewolves', c.wolves, v => setCfg({ wolves: v }), 1, 6),
+    toggle('🔮 Seer', c.seer, v => setCfg({ seer: v })),
+    toggle('🩺 Doctor', c.doctor, v => setCfg({ doctor: v })),
+    el('div', { class: 'opt' }, el('span', {}, '🧑‍🌾 Villagers'), el('b', { class: 'muted' }, String(vill))),
+    probs.length ? el('p', { class: 'hint warn' }, probs[0]) : null,
+    el('button', { class: 'btn primary big', disabled: probs.length ? true : null, onclick: () => { Narrator.prime(); hostAct(hostDeal); } }, `Deal ${n} card${n === 1 ? '' : 's'}`),
+    el('div', { class: 'row', style: 'margin-top:12px' },
+      el('span', { class: 'small muted' }, 'Trying it out alone? Bots can fill empty seats.'),
+      s.players.some(p => isBot(p.pid))
+        ? el('button', { class: 'btn sm ghost', onclick: () => hostAct(x => { x.players = x.players.filter(p => !isBot(p.pid)); for (const pid in Net.inputs) if (isBot(pid)) delete Net.inputs[pid]; Bots.last = {}; if (x.cfg.auto) Object.assign(x.cfg, defaultCfg(x.players.length)); }) }, 'Remove bots')
+        : el('button', { class: 'btn sm', onclick: () => hostAct(x => Bots.add(x, Math.max(1, 7 - x.players.length))) }, 'Add bots')));
+}
+function playersCard(s, mode) {
+  const rows = s.players.map(p => {
+    const r = roleOf(s, p); const dead = mode !== 'lobby' && p.alive === false;
+    let mark = null;
+    if (mode === 'deal') mark = p.ready ? '✓ ready' : (p.card != null ? 'reading…' : 'picking…');
+    else if (mode === 'day' && !dead) mark = (s.ready || []).includes(p.pid) ? '✓ ready' : '';
+    else if (mode === 'vote' && !dead) mark = (s.voted || []).includes(p.pid) ? '✓ voted' : '…';
+    return el('div', { class: 'prow' + (dead ? ' dead' : '') },
+      el('span', { class: 'dot ' + (Net.online.has(p.pid) || isBot(p.pid) ? 'on' : 'off'), title: Net.online.has(p.pid) || isBot(p.pid) ? 'Online' : 'Offline' }),
+      el('span', { class: 'pn' }, p.name + (p.pid === myPid ? ' (you)' : '')),
+      dead ? el('span', { class: 'pr' }, p.died && p.died.how === 'left' ? 'left the game' : `${(ROLES[r] || {}).icon || ''} ${(ROLES[r] || {}).name || ''}`) : null,
+      mark ? el('span', { class: 'pm' }, mark) : null,
+      Host.active && mode === 'lobby' ? el('button', { class: 'icon-btn', 'aria-label': `Remove ${p.name}`, onclick: () => ask(`Remove ${p.name}?`, '', 'Remove', () => hostAct(x => removePlayer(x, p.pid))) }, '✕') : null);
+  });
+  return el('section', { class: 'card' },
+    el('h3', {}, mode === 'lobby' ? `Players · ${s.players.length}` : 'Players'),
+    rows.length ? rows : el('p', { class: 'muted' }, 'Nobody has joined yet.'));
+}
+function roleCard(r, o) {
+  o = o || {}; const R = ROLES[r] || { name: '?', icon: '❔', desc: '', team: '', color: '#666' };
+  return el('div', { class: 'rcard ' + (r || '') + (o.flip ? ' flip-in' : '') + (o.compact ? ' compact' : ''), style: `--rc:${R.color}` },
+    o.title ? el('div', { class: 'rc-title' }, o.title) : null,
+    el('div', { class: 'rc-ico' }, R.icon),
+    el('div', { class: 'rc-name' }, R.name),
+    el('div', { class: 'rc-team' }, R.team === 'wolves' ? 'Team Werewolves' : 'Team Village'),
+    o.compact || o.noDesc ? null : el('p', { class: 'rc-desc' }, R.desc),
+    o.extra ? el('div', { class: 'rc-extra' }, o.extra) : null);
+}
+function roleExtra(s, me) {
+  const r = roleOf(s, me);
+  if (r === 'wolf') {
+    const pack = s.players.filter(p => p.pid !== me.pid && roleOf(s, p) === 'wolf');
+    return pack.length ? 'Your pack: ' + pack.map(p => p.name + (p.alive ? '' : ' (out)')).join(', ') : 'You are the only werewolf.';
+  }
+  if (r === 'seer') {
+    const h = (s.seerLog || []).map(x => `Night ${x.r}: ${nm(s, x.t)} — ${roleOf(s, byPid(s, x.t)) === 'wolf' ? 'WEREWOLF' : 'not a werewolf'}`);
+    return h.length ? el('div', {}, h.map(t => el('div', {}, t))) : null;
+  }
+  return null;
+}
+function roleBar(s, me) {
+  if (!me || !roleOf(s, me)) return null;
+  if (S.peekUntil > now()) {
+    return el('div', { class: 'peek' },
+      roleCard(roleOf(s, me), { compact: true, extra: roleExtra(s, me) }),
+      el('button', { class: 'btn sm ghost', onclick: () => { S.peekUntil = 0; render(); } }, 'Hide'));
+  }
+  return el('button', { class: 'peek-btn', onclick: () => { S.peekUntil = now() + 6000; render(); setTimeout(render, 6100); } }, '👁  Tap to peek at your role');
+}
+function dealView(s, me) {
+  if (!me) return [narr(s), el('section', { class: 'card center' }, el('p', {}, 'Cards are being dealt. You’re watching this game, and you can join the next one.')), playersCard(s, 'deal')];
+  if (me.card == null) {
+    const myClaim = myInput.claim && myInput.claim.d === s.deal.id ? myInput.claim.c : null;
+    const lost = myClaim != null && s.deal.owners[myClaim] && s.deal.owners[myClaim] !== myPid;
+    return [narr(s),
+      el('h2', { class: 'center' }, 'Pick a card'),
+      el('p', { class: 'center muted' }, lost ? 'Someone grabbed that one first. Pick another.' : 'Any card. Each hides one secret role.'),
+      el('div', { class: 'cards' }, s.deal.owners.map((o, i) => {
+        const pending = myClaim === i && !o;
+        return el('button', { class: 'fcard' + (o ? ' taken' : '') + (pending ? ' pending' : ''), 'aria-label': o ? `Card ${i + 1}, taken by ${nm(s, o)}` : `Card ${i + 1}`, disabled: o ? true : null,
+          onclick: () => { if (!o) { keepAwake(); sendInput({ claim: { d: s.deal.id, c: i } }); } } },
+          o ? el('span', { class: 'owner' }, nm(s, o)) : null);
+      }))];
+  }
+  const r = roleOf(s, me);
+  const ready = me.ready || myInput.rdy === s.deal.id;
+  if (!ready) {
+    const first = !S.flipped[s.deal.id];
+    if (first) setTimeout(() => { S.flipped[s.deal.id] = true; }, 900);
+    return [
+      el('h2', { class: 'center' }, 'Your secret role'),
+      el('p', { class: 'center muted', style: 'margin-bottom:14px' }, 'Memorise it and keep your screen hidden.'),
+      roleCard(r, { flip: first }),
+      el('button', { class: 'btn primary big', onclick: () => sendInput({ rdy: s.deal.id }) }, 'I’ve memorised it — Ready')];
+  }
+  const nReady = s.players.filter(p => p.ready).length;
+  return [narr(s),
+    el('section', { class: 'card center' },
+      el('div', { class: 'big-emoji' }, '🌘'),
+      el('h2', {}, 'Ready'),
+      el('p', { class: 'muted' }, `Waiting for everyone… ${nReady} of ${s.players.length} ready. When all are ready, night begins.`)),
+    roleBar(s, me),
+    playersCard(s, 'deal')];
+}
+function head(icon, title, sub) {
+  return el('div', { class: 'act-head' }, el('span', { class: 'act-ico' }, icon), el('div', {}, el('h2', {}, title), sub ? el('p', { class: 'muted' }, sub) : null));
+}
+function targetsList(s, list, selected, onpick, opts) {
+  opts = opts || {};
+  return el('div', { class: 'targets' }, list.map(p => {
+    const dis = opts.disabled && opts.disabled(p);
+    return el('button', { class: 'target' + (selected === p.pid ? ' sel' : ''), disabled: dis ? true : null, onclick: () => onpick(p.pid) },
+      el('span', { class: 'tname' }, p.name + (p.pid === myPid ? ' (you)' : '')),
+      dis && opts.note ? el('span', { class: 'tnote' }, opts.note) : null,
+      opts.tags ? opts.tags(p) : null);
+  }));
+}
+function nightView(s, me) {
+  const r = me ? roleOf(s, me) : null; const alive = !!(me && me.alive);
+  if (alive && r === 'wolf' && s.step === 'wolf') return wolfPanel(s, me);
+  if (alive && r === 'seer' && s.step === 'seer') return seerPanel(s, me);
+  if (alive && r === 'doctor' && s.step === 'doctor') return doctorPanel(s, me);
+  return el('section', { class: 'sleep' },
+    el('div', { class: 'moon-big' }),
+    el('h2', {}, `Night ${s.round}`),
+    el('p', { class: 'muted' }, me && !me.alive ? 'You’re out. Keep your eyes closed and stay silent.' : (me ? 'Keep your eyes closed until the narrator wakes you.' : 'Night has fallen.')),
+    s.say ? el('p', { class: 'say-dim' }, '“' + s.say.text + '”') : null);
+}
+function wolfPanel(s, me) {
+  const k = key(s, 'wolf'); const a = myInput.act && myInput.act.k === k ? myInput.act : null;
+  const pack = s.players.filter(p => p.alive && p.pid !== me.pid && roleOf(s, p) === 'wolf');
+  const picks = (s.night && s.night.picks) || {};
+  const targets = s.players.filter(p => p.alive && roleOf(s, p) !== 'wolf');
+  const myT = a && validWolfTarget(s, a.t) ? a.t : null;
+  const agree = myT && pack.every(w => picks[w.pid] && picks[w.pid].t === myT);
+  return el('section', { class: 'action wolf' },
+    head('🐺', 'Werewolves, wake up', pack.length ? 'Your pack: ' + pack.map(p => p.name).join(', ') : 'You hunt alone tonight.'),
+    targetsList(s, targets, myT, pid => sendInput({ act: { k, t: pid, c: false } }), {
+      tags: p => pack.filter(w => picks[w.pid] && picks[w.pid].t === p.pid).map(w => el('span', { class: 'tag' }, w.name + (picks[w.pid].c ? ' ✓' : ''))),
+    }),
+    a && a.c && myT
+      ? el('p', { class: 'hint center' }, agree ? 'Your pack agrees. Close your eyes.' : 'Waiting for your pack to pick the same person…')
+      : el('button', { class: 'btn danger big', disabled: myT ? null : true, onclick: () => sendInput({ act: { k, t: myT, c: true } }) }, myT ? `Eliminate ${nm(s, myT)}` : 'Choose a victim'));
+}
+function seerPanel(s, me) {
+  const k = key(s, 'seer'); const a = myInput.act && myInput.act.k === k ? myInput.act : null;
+  if (a && a.c && validTarget(s, a.t, me.pid)) {
+    const t = byPid(s, a.t); const bad = roleOf(s, t) === 'wolf';
+    return el('section', { class: 'action seer' },
+      head('🔮', 'The Seer sees…'),
+      el('div', { class: 'reveal ' + (bad ? 'bad' : 'good') },
+        el('div', { class: 'rv-ico' }, bad ? '🐺' : '🕊️'),
+        el('div', { class: 'rv-name' }, t.name),
+        el('div', { class: 'rv-txt' }, bad ? 'is a werewolf' : 'is not a werewolf')),
+      a.x ? el('p', { class: 'hint center' }, 'Close your eyes.')
+        : el('button', { class: 'btn primary big', onclick: () => sendInput({ act: Object.assign({}, a, { x: true }) }) }, 'Got it — close my eyes'));
+  }
+  const sel = S.sel[k];
+  const prev = new Set((s.seerLog || []).map(x => x.t));
+  return el('section', { class: 'action seer' },
+    head('🔮', 'Seer, wake up', 'Choose one person to look into.'),
+    targetsList(s, s.players.filter(p => p.alive && p.pid !== me.pid), sel, pid => { S.sel[k] = pid; render(); }, {
+      tags: p => prev.has(p.pid) ? el('span', { class: 'tnote' }, 'checked before') : null,
+    }),
+    el('button', { class: 'btn primary big', disabled: sel ? null : true, onclick: () => sendInput({ act: { k, t: sel, c: true } }) }, sel ? `Reveal ${nm(s, sel)}` : 'Choose someone'),
+    (s.seerLog || []).length ? el('div', { class: 'hist' }, roleExtra(s, me)) : null);
+}
+function doctorPanel(s, me) {
+  const k = key(s, 'doctor'); const a = myInput.act && myInput.act.k === k ? myInput.act : null;
+  if (a && a.c && validDocTarget(s, a.t)) {
+    return el('section', { class: 'action doctor' }, head('🩺', 'Protected', `You’re guarding ${nm(s, a.t)} tonight.`), el('p', { class: 'hint center' }, 'Close your eyes.'));
+  }
+  const sel = S.sel[k]; const last = s.night && s.night.lastDoc;
+  return el('section', { class: 'action doctor' },
+    head('🩺', 'Doctor, wake up', 'Choose one person to protect tonight.'),
+    targetsList(s, s.players.filter(p => p.alive), sel, pid => { S.sel[k] = pid; render(); }, { disabled: p => p.pid === last, note: 'protected last night' }),
+    el('button', { class: 'btn primary big', disabled: sel && sel !== last ? null : true, onclick: () => sendInput({ act: { k, t: sel, c: true } }) }, sel && sel !== last ? `Protect ${nm(s, sel)}` : 'Choose someone'));
+}
+function newsCard(s) {
+  const n = s.news;
+  if (!n) return null;
+  if (n.killed) {
+    const p = byPid(s, n.killed); const r = roleOf(s, p);
+    return el('section', { class: 'card news' }, el('div', { class: 'big-emoji' }, '🪦'), el('h2', {}, `${p.name} was killed`), el('p', { class: 'muted' }, `They were ${article(r)} ${(ROLES[r] || {}).icon || ''}`));
+  }
+  return el('section', { class: 'card news' }, el('div', { class: 'big-emoji' }, '🌅'), el('h2', {}, 'Nobody died last night'));
+}
+function deadNote(me) {
+  if (!me) return el('section', { class: 'card center' }, el('p', { class: 'muted' }, 'You’re watching this game.'));
+  return el('section', { class: 'card center' }, el('p', { class: 'muted' }, 'You’re out of the game. Please don’t talk or give hints 🤐'));
+}
+function dayView(s, me) {
+  const out = [narr(s), newsCard(s)];
+  const a = aliveOf(s).length;
+  if (me && me.alive) {
+    const k = key(s, 'vr'); const isReady = myInput.vr === k;
+    out.push(el('section', { class: 'card center' },
+      el('p', { class: 'muted' }, 'Discuss together. When you’re ready to vote, tap below. Voting starts once everyone is ready.'),
+      el('button', { class: 'btn big ' + (isReady ? '' : 'primary'), onclick: () => sendInput({ vr: isReady ? null : k }) }, isReady ? '✓ Ready — tap to undo' : 'Ready to vote'),
+      el('p', { class: 'small muted', style: 'margin-top:10px' }, `${(s.ready || []).length} of ${a} ready`)));
+  } else out.push(deadNote(me));
+  out.push(playersCard(s, 'day'));
+  return out;
+}
+function voteView(s, me) {
+  const k = key(s, 'vote'); const my = myInput.vote && myInput.vote.k === k ? myInput.vote.t : null;
+  const a = aliveOf(s).length; const n = (s.voted || []).length;
+  if (me && me.alive) {
+    return [narr(s), el('section', { class: 'card' },
+      el('h2', {}, 'Vote'),
+      el('p', { class: 'muted', style: 'margin-bottom:10px' }, 'Who should be eliminated? You can change your vote until everyone has voted.'),
+      targetsList(s, s.players.filter(p => p.alive && p.pid !== me.pid), my, pid => sendInput({ vote: { k, t: pid } })),
+      el('button', { class: 'target skip' + (my === 'skip' ? ' sel' : ''), onclick: () => sendInput({ vote: { k, t: 'skip' } }) }, 'Skip — eliminate nobody'),
+      el('p', { class: 'small muted center', style: 'margin-top:12px' }, s.allInAt ? 'All votes are in…' : `${n} of ${a} voted`))];
+  }
+  return [narr(s), el('section', { class: 'card center' }, el('h2', {}, 'Voting'), el('p', { class: 'muted' }, `${n} of ${a} voted`)), deadNote(me), playersCard(s, 'vote')];
+}
+function resultView(s) {
+  const R = s.result || {}; const votes = R.votes || {};
+  const groups = {}; for (const [v, t] of Object.entries(votes)) (groups[t] = groups[t] || []).push(v);
+  const rows = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  const outP = R.out ? byPid(s, R.out) : null;
+  return [narr(s), el('section', { class: 'card' },
+    el('h2', { class: 'center' }, 'The votes are in'),
+    el('div', { class: 'tally' }, rows.length ? rows.map(([t, vs]) => el('div', { class: 'trow' + (t === R.out ? ' out' : '') },
+      el('div', { class: 'tn' }, t === 'skip' ? 'Skip' : nm(s, t)),
+      el('div', { class: 'tc' }, String(vs.length)),
+      el('div', { class: 'tv' }, vs.map(v => el('span', { class: 'tag' }, nm(s, v)))))) : el('p', { class: 'muted center' }, 'No votes were cast.')),
+    outP ? el('div', { class: 'reveal-card' }, roleCard(roleOf(s, outP), { title: `${outP.name} was…`, noDesc: true }))
+      : el('p', { class: 'center big-text' }, R.tie ? 'It’s a tie — nobody is eliminated.' : 'Nobody is eliminated.'),
+    el('p', { class: 'small muted center' }, 'Night falls in a few seconds…'))];
+}
+function overView(s) {
+  const w = s.winner;
+  return [
+    el('section', { class: 'win ' + w },
+      el('div', { class: 'big-emoji' }, w === 'village' ? '🌅' : '🐺'),
+      el('h1', {}, w === 'village' ? 'Villagers win!' : 'Werewolves win!'),
+      el('p', {}, s.say ? s.say.text : '')),
+    el('section', { class: 'card' },
+      el('h3', {}, 'Everyone’s roles'),
+      s.players.map(p => { const r = roleOf(s, p); const R = ROLES[r] || {}; return el('div', { class: 'prow' },
+        el('span', { class: 'pi' }, R.icon || '❔'),
+        el('span', { class: 'pn' }, p.name + (p.pid === myPid ? ' (you)' : '')),
+        el('span', { class: 'pr' }, R.name || '—'),
+        el('span', { class: 'ps ' + (p.alive ? 'alive' : 'dead') }, p.alive ? 'survived' : 'out')); })),
+    Host.active
+      ? el('div', { class: 'stack' },
+          el('button', { class: 'btn primary big', onclick: () => { Narrator.prime(); hostAct(x => { if (hostDeal(x) === false) toLobby(x); }); } }, 'Play again — same players'),
+          el('button', { class: 'btn', onclick: () => hostAct(toLobby) }, 'Back to lobby (change players or roles)'))
+      : el('p', { class: 'center muted' }, 'Waiting for the narrator to start another game…')];
+}
+function connLabel() {
+  if (!Net.B) return '';
+  const where = Net.B.mode === 'local' ? 'Test mode · tabs in this browser only' : '';
+  if (Net.B.mode === 'local') return where;
+  return Net.connected ? '● Live' : '○ Reconnecting…';
+}
+function rulesBox() {
+  return el('div', { class: 'rules card' },
+    el('h4', {}, 'Goal'),
+    el('p', {}, 'Villagers win when every werewolf is out. Werewolves win when they equal or outnumber everyone else.'),
+    el('h4', {}, 'Night'),
+    el('ul', {},
+      el('li', {}, 'Werewolves wake together and must all pick the same victim.'),
+      el('li', {}, 'The Seer checks one person: werewolf or not.'),
+      el('li', {}, 'The Doctor protects one person (not the same person two nights in a row). A protected victim survives.'),
+      el('li', {}, 'Every role is called each night, even if that player is out, so the timing gives nothing away.')),
+    el('h4', {}, 'Day'),
+    el('ul', {},
+      el('li', {}, 'Anyone who died is revealed. Discuss, then tap Ready to vote.'),
+      el('li', {}, 'Most votes is eliminated and their role is revealed. A tie, or Skip winning, eliminates nobody.'),
+      el('li', {}, 'Players who are out stay silent.')),
+    el('h4', {}, 'Narrator device'),
+    el('p', {}, 'Keep it plugged in with the screen on. If it drops out, any phone can tap “Narrate here” to take over.'));
+}
+function footer(s) {
+  const inRoom = Net.code && Net.room === 'ok';
+  return el('footer', { class: 'foot' },
+    el('button', { class: 'link', onclick: () => { S.rules = !S.rules; render(); } }, S.rules ? 'Hide rules' : 'How to play'),
+    inRoom && !Host.active ? el('button', { class: 'link', onclick: () => ask('Leave this room?', 'You can rejoin with the room code.', 'Leave room', () => { leaveRoom(); setUrl(null); render(); }) }, 'Leave room') : null,
+    el('span', { class: 'conn' }, connLabel()),
+    S.rules ? rulesBox() : null);
+}
+function modal() {
+  const c = S.confirm; if (!c) return null;
+  const close = () => { S.confirm = null; render(); };
+  return el('div', { class: 'modal', onclick: e => { if (e.target === e.currentTarget) close(); } },
+    el('div', { class: 'mbox', role: 'dialog', 'aria-modal': 'true' },
+      el('h3', {}, c.title), c.text ? el('p', { class: 'muted' }, c.text) : null,
+      el('div', { class: 'row gap' },
+        el('button', { class: 'btn ghost', onclick: close }, 'Cancel'),
+        el('button', { class: 'btn primary', onclick: () => { const f = c.fn; S.confirm = null; f(); render(); } }, c.yes || 'OK'))));
+}
+
+/* periodic redraw for time-based hints (offline narrator, slow joins) */
+setInterval(() => { if (Net.state && Net.state.phase !== 'night') render(); }, 5000);
+
+/* test hooks */
+window.__ww = {
+  get state() { return Net.state; }, get pid() { return myPid; }, get input() { return myInput; }, get code() { return Net.code; },
+  role() { const s = Net.state; return s ? roleOf(s, byPid(s, myPid)) : null; },
+  get host() { return Host.active; },
+  inputs() { return JSON.parse(JSON.stringify(Net.inputs)); },
+  stats() { return Object.assign({ speaking: Narrator.speakingId, done: Object.keys(Narrator.done).length, gen: Narrator.gen, active: Host.active, tickQ: Host.tickQ }, STATS); },
+};
+
+/* ================= boot ================= */
+(async () => {
+  render();
+  try {
+    const B = await connect();
+    if (!B) { Net.mode = 'unconfigured'; render(); return; }
+    Net.B = B; Net.mode = 'ready';
+    B.onConnected(c => { Net.connected = c; render(); });
+    const code = normCode(new URLSearchParams(location.search).get('room'));
+    if (code.length === 4) await enterRoom(code);
+    render();
+  } catch (e) {
+    console.error(e); Net.mode = 'error'; render();
+  }
+})();
+</script>
+</body>
+</html>

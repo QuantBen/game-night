@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1124">
+<meta name="description" content="Party games for one room: everyone plays on their own phone.">
+<title>Game Night</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🌙%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/base.css">
+<style>
+.join-row{display:flex;gap:10px}
+.join-row .input{flex:1}
+.join-row .btn{flex:none;padding-left:22px;padding-right:22px}
+.section-title{margin:22px 4px 10px}
+.games{display:flex;flex-direction:column;gap:12px}
+.game{display:flex;gap:16px;align-items:center;padding:18px;border-radius:var(--r);background:var(--card);border:1px solid var(--line);text-decoration:none;color:inherit;position:relative;overflow:hidden;transition:transform .12s ease,border-color .2s}
+.game::before{content:"";position:absolute;inset:0;background:radial-gradient(240px 140px at 0% 0%,var(--g),transparent 70%);opacity:.28;pointer-events:none}
+.game:hover{transform:translateY(-2px);border-color:var(--g)}
+.game .gi{font-size:44px;width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25);flex:none;position:relative}
+.game .gb{flex:1;min-width:0;position:relative}
+.game .gn{font-family:Cinzel,Georgia,serif;font-size:21px;font-weight:800}
+.game .gt{color:var(--muted);font-size:14px;margin-top:2px}
+.game .gm{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.game .go{font-size:22px;color:var(--muted);position:relative}
+.soon{padding:16px 18px;border-radius:var(--r);border:1px dashed var(--line);color:var(--muted);font-size:14px;text-align:center}
+</style>
+</head>
+<body class="dusk">
+<div class="wrap">
+  <header class="top"><a class="brand" href="/" id="home"><span class="moon"></span>Game Night</a></header>
+
+  <section class="hero">
+    <div class="moon-big"></div>
+    <h1>Game Night</h1>
+    <p>Party games for everyone in the room. One phone each, no game master needed.</p>
+  </section>
+
+  <section class="card">
+    <h3>Got a room code?</h3>
+    <form class="join-row" id="join" autocomplete="off">
+      <input id="code" class="input code-input" maxlength="4" placeholder="ABCD" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Room code">
+      <button class="btn primary" id="joinBtn" type="submit">Join</button>
+    </form>
+    <p class="hint" id="msg" role="status"></p>
+  </section>
+
+  <h3 class="section-title">Pick a game</h3>
+  <div class="games" id="games"></div>
+
+  <footer class="foot"><span class="conn" id="conn"></span></footer>
+</div>
+<script type="module">
+import { connect, normCode, roomInfo, withLocal, isConfigured, wantsLocal } from '/shared/realtime.js';
+
+// To add a game: put it in its own folder (e.g. /spyfall/index.html) and add an entry here.
+const GAMES = [
+  { id: 'werewolf', name: 'Werewolf', icon: '🐺', color: '#d94848',
+    tagline: 'Find the werewolves before they find you.', tags: ['5–15 players', '20–40 min', 'Narrated'] },
+];
+
+const $ = id => document.getElementById(id);
+const list = $('games');
+for (const g of GAMES) {
+  const a = document.createElement('a');
+  a.className = 'game'; a.href = withLocal('/' + g.id); a.style.setProperty('--g', g.color);
+  a.innerHTML = '<span class="gi"></span><span class="gb"><div class="gn"></div><div class="gt"></div><div class="gm"></div></span><span class="go">›</span>';
+  a.querySelector('.gi').textContent = g.icon;
+  a.querySelector('.gn').textContent = g.name;
+  a.querySelector('.gt').textContent = g.tagline;
+  for (const t of g.tags) { const c = document.createElement('span'); c.className = 'chip'; c.textContent = t; a.querySelector('.gm').append(c); }
+  list.append(a);
+}
+const soon = document.createElement('div'); soon.className = 'soon'; soon.textContent = 'More games coming soon.'; list.append(soon);
+$('home').href = withLocal('/');
+$('conn').textContent = wantsLocal() ? 'Test mode · tabs in this browser only' : (isConfigured() ? '' : 'Live sync not set up yet (see README)');
+
+const code = $('code'), msg = $('msg'), btn = $('joinBtn');
+code.addEventListener('input', () => { code.value = normCode(code.value); msg.textContent = ''; });
+let B = null;
+$('join').addEventListener('submit', async e => {
+  e.preventDefault();
+  const c = normCode(code.value);
+  if (c.length !== 4) { msg.textContent = 'Room codes have 4 letters.'; return; }
+  btn.disabled = true; msg.textContent = 'Looking for the room…';
+  try {
+    B = B || await connect();
+    if (!B) { msg.textContent = 'Live sync isn’t set up on this site yet.'; return; }
+    const meta = await roomInfo(B, c);
+    if (!meta || !meta.game) { msg.textContent = `No room called ${c}. Check the code on the narrator’s screen.`; return; }
+    location.href = withLocal(`/${encodeURIComponent(meta.game)}?room=${c}`);
+  } catch (err) {
+    console.error(err); msg.textContent = 'Couldn’t reach the server. Check your connection.';
+  } finally { btn.disabled = false; }
+});
+</script>
+</body>
+</html>
