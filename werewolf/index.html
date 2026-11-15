@@ -306,10 +306,13 @@ function mergeInput(inp) {
   Net.inputs[inp.pid] = inp;
   return true;
 }
+const HIST = [];
+function hist(kind, st) { HIST.push(`${kind} v${st.ver} ${st.phase}/${st.step} say=${st.say ? st.say.id : '-'} t=${now() % 100000}`); if (HIST.length > 40) HIST.shift(); }
 function acceptState(st) {
   if (!st || typeof st !== 'object' || typeof st.ver !== 'number' || !Array.isArray(st.players)) return;
   const cur = Net.state;
   if (cur && (st.ver < cur.ver || (st.ver === cur.ver && (st.ts || 0) <= (cur.ts || 0)))) return;
+  hist('accept', st);
   Net.state = st;
   if (Host.active && st.host !== myPid) Host.stop('Another device is narrating now.');
   render(); hostKick();
@@ -338,6 +341,7 @@ function publishState(s) {
   s.ver = Math.max(s.ver || 0, Net.state ? Net.state.ver : 0) + 1;
   s.ts = now();
   Net.state = s;
+  hist('publish', s);
   queueWrite(base() + '/state', JSON.stringify(s));
   render(); hostKick();
 }
@@ -431,10 +435,11 @@ const Narrator = {
   async say(id, text) {
     if (this.speakingId === id || this.done[id]) return;
     STATS.says++;
-    const g = ++this.gen; this.speakingId = id; render();
+    const g = ++this.gen;
     const est = this.est(text);
-    const p = this.which() === 'device' ? this.deviceSay(text) : sleep(est);
-    await Promise.race([p, sleep(est * 2 + 5000)]);
+    if (this.which() !== 'device') { this.done[id] = now() + est; render(); hostKick(); return; } // silent: "finishes" after reading time
+    this.speakingId = id; render();
+    await Promise.race([this.deviceSay(text), sleep(est * 2 + 5000)]);
     if (g !== this.gen) return;            // stopped or repeated meanwhile
     this.speakingId = null; this.done[id] = now();
     render(); hostKick();
@@ -464,6 +469,14 @@ async function keepAwake() {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (Host.active || myInput.gid)) keepAwake(); });
 
 /* ================= narrator / host engine ================= */
+// The narrator's heartbeat runs in a worker: browsers slow down page timers in background tabs, not worker ones.
+function startTicker(fn, ms) {
+  try {
+    const url = URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${ms});`], { type: 'text/javascript' }));
+    const w = new Worker(url); w.onmessage = () => fn();
+    return () => { w.terminate(); URL.revokeObjectURL(url); };
+  } catch (e) { const id = setInterval(fn, ms); return () => clearInterval(id); }
+}
 const Host = {
   active: false, iv: null, unsub: null, tickQ: false,
   start() {
@@ -474,11 +487,11 @@ const Host = {
       for (const raw of Object.values(obj || {})) { if (typeof raw !== 'string') continue; try { if (mergeInput(JSON.parse(raw))) ch = true; } catch (e) {} }
       if (ch) hostKick();
     });
-    this.iv = setInterval(() => this.tick(), 400);
+    this.iv = startTicker(() => this.tick(), 400);
     updatePresence(); this.tick(); render();
   },
   stop(msg) {
-    this.active = false; clearInterval(this.iv); this.iv = null;
+    this.active = false; if (this.iv) this.iv(); this.iv = null;
     if (this.unsub) { try { this.unsub(); } catch (e) {} this.unsub = null; }
     Narrator.stop(); updatePresence();
     if (msg) toast(msg);
@@ -1435,6 +1448,10 @@ window.__ww = {
   role() { const s = Net.state; return s ? roleOf(s, byPid(s, myPid)) : null; },
   get host() { return Host.active; },
   inputs() { return JSON.parse(JSON.stringify(Net.inputs)); },
+  hist() { return HIST.slice(); },
+  debug() { const s = Net.state; if (!s) return null; const id = s.say && s.say.id; let eng = null, err = null;
+    try { const c = clone(s); eng = engine(c); eng = { changed: eng, phase: c.phase, step: c.step }; } catch (e) { err = String(e && e.stack || e); }
+    return { id, done: id ? Narrator.done[id] || null : null, now: now(), stepAt: s.stepAt, speaking: Narrator.speakingId, gen: Narrator.gen, eng, err, hostPid: s.host, myPid, active: Host.active, iv: !!Host.iv }; },
   stats() { return Object.assign({ speaking: Narrator.speakingId, done: Object.keys(Narrator.done).length, gen: Narrator.gen, active: Host.active, tickQ: Host.tickQ }, STATS); },
 };
 

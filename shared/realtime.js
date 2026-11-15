@@ -137,6 +137,13 @@ function localBackend() {
   }
   // Other tabs hear about changes through the storage event, which fires only after the new value is readable.
   addEventListener('storage', e => { if (e.key && e.key.startsWith(PFX)) notify(e.key.slice(PFX.length)); });
+  // Safety net: background tabs can get storage events late, so re-check subscriptions every so often.
+  setInterval(() => {
+    for (const s of subs) {
+      const v = read(s.path); const j = JSON.stringify(v);
+      if (j !== s.last) { s.last = j; try { s.cb(v); } catch (e) { console.error(e); } }
+    }
+  }, 700);
   addEventListener('pagehide', () => { for (const p of mine) write(p, null); });
   return {
     mode: 'local',
